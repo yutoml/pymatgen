@@ -28,9 +28,9 @@ except PackageNotFoundError:  # pragma: no cover
     pass
 
 
-SETTINGS_FILE = os.getenv["PMG_SETTINGS_FILE"] or os.path.join(
+SETTINGS_FILE = os.environ["PMG_SETTINGS_FILE"] or os.path.join(
     os.path.expanduser("~"), ".config", ".pmgrc.yaml")
-OLD_SETTINGS_FILE = os.getenv["PMG_OLD_SETTINGS_FILE"] or os.path.join(
+OLD_SETTINGS_FILE = os.environ["PMG_OLD_SETTINGS_FILE"] or os.path.join(
     os.path.expanduser("~"), ".pmgrc.yaml")
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 PKG_DIR = os.path.dirname(MODULE_DIR)
