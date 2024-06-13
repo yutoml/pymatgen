@@ -28,8 +28,10 @@ except PackageNotFoundError:  # pragma: no cover
     pass
 
 
-SETTINGS_FILE = os.path.join(os.path.expanduser("~"), ".config", ".pmgrc.yaml")
-OLD_SETTINGS_FILE = os.path.join(os.path.expanduser("~"), ".pmgrc.yaml")
+SETTINGS_FILE = os.getenv["PMG_SETTINGS_FILE"] or os.path.join(
+    os.path.expanduser("~"), ".config", ".pmgrc.yaml")
+OLD_SETTINGS_FILE = os.getenv["PMG_OLD_SETTINGS_FILE"] or os.path.join(
+    os.path.expanduser("~"), ".pmgrc.yaml")
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 PKG_DIR = os.path.dirname(MODULE_DIR)
 ROOT = os.path.dirname(PKG_DIR)
@@ -50,7 +52,8 @@ def _load_pmg_settings() -> dict[str, Any]:
         except Exception as exc:
             # If there are any errors, default to using environment variables
             # if present.
-            warnings.warn(f"Error loading {file_path}: {exc}.\nYou may need to reconfigure your YAML file.")
+            warnings.warn(
+                f"Error loading {file_path}: {exc}.\nYou may need to reconfigure your YAML file.")
 
     # Override .pmgrc.yaml with env vars (if present)
     for key, val in os.environ.items():
