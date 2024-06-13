@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.linalg import norm
@@ -14,6 +14,8 @@ from scipy.spatial import ConvexHull
 from pymatgen.analysis.chemenv.utils.chemenv_errors import SolidAngleError
 
 if TYPE_CHECKING:
+    from typing import Callable
+
     from numpy.typing import ArrayLike
     from typing_extensions import Self
 
@@ -368,14 +370,19 @@ def solid_angle(center, coords):
     origin = np.array(center)
     r = [np.array(c) - origin for c in coords]
     r.append(r[0])
-    n = [np.cross(r[i + 1], r[i]) for i in range(len(r) - 1)]
-    n.append(np.cross(r[1], r[0]))
+    cross_products = [np.cross(r[i + 1], r[i]) for i in range(len(r) - 1)]
+    cross_products.append(np.cross(r[1], r[0]))
     phi = 0.0
-    for idx in range(len(n) - 1):
+    for idx in range(len(cross_products) - 1):
         try:
-            value = math.acos(-np.dot(n[idx], n[idx + 1]) / (np.linalg.norm(n[idx]) * np.linalg.norm(n[idx + 1])))
+            value = math.acos(
+                -np.dot(cross_products[idx], cross_products[idx + 1])
+                / (np.linalg.norm(cross_products[idx]) * np.linalg.norm(cross_products[idx + 1]))
+            )
         except ValueError:
-            cos = -np.dot(n[idx], n[idx + 1]) / (np.linalg.norm(n[idx]) * np.linalg.norm(n[idx + 1]))
+            cos = -np.dot(cross_products[idx], cross_products[idx + 1]) / (
+                np.linalg.norm(cross_products[idx]) * np.linalg.norm(cross_products[idx + 1])
+            )
             if 0.999999999999 < cos < 1.000000000001:
                 value = math.acos(1.0)
             elif -0.999999999999 > cos > -1.000000000001:
@@ -406,7 +413,6 @@ def vectorsToMatrix(aa, bb):
 
 def matrixTimesVector(MM, aa):
     """
-
     Args:
         MM: A matrix of size 3x3
         aa: A vector of size 3
@@ -453,8 +459,7 @@ def rotateCoordsOpt(coords, R):
 
 
 def changebasis(uu, vv, nn, pps):
-    """
-    For a list of points given in standard coordinates (in terms of e1, e2 and e3), returns the same list
+    """For a list of points given in standard coordinates (in terms of e1, e2 and e3), returns the same list
     expressed in the basis (uu, vv, nn), which is supposed to be orthonormal.
 
     Args:
@@ -525,8 +530,7 @@ def anticlockwise_sort(pps):
 
 
 def anticlockwise_sort_indices(pps):
-    """
-    Returns the indices that would sort a list of 2D points in anticlockwise order
+    """Get the indices that would sort a list of 2D points in anticlockwise order
 
     Args:
         pps: List of points to be sorted
@@ -614,7 +618,7 @@ def is_anion_cation_bond(valences, ii, jj) -> bool:
 
 
 class Plane:
-    """Class used to describe a plane."""
+    """Describe a plane."""
 
     TEST_2D_POINTS = (
         np.array([0, 0], float),
@@ -641,8 +645,7 @@ class Plane:
     )
 
     def __init__(self, coefficients, p1=None, p2=None, p3=None):
-        """
-        Initializes a plane from the 4 coefficients a, b, c and d of ax + by + cz + d = 0
+        """Initialize a plane from the 4 coefficients a, b, c and d of ax + by + cz + d = 0
 
         Args:
             coefficients: abcd coefficients of the plane.
@@ -702,12 +705,7 @@ class Plane:
             self.p3[zeros[1]] = 1.0
 
     def __str__(self):
-        """
-        String representation of the Plane object
-
-        Returns:
-            String representation of the Plane object.
-        """
+        """String representation of the Plane."""
         return (
             f"Plane object\n  => Normal vector : {self.normal_vector}\n  => Equation of the plane"
             f" ax + by + cz + d = 0\n     with a = {self._coefficients[0]}\n          "
@@ -752,8 +750,7 @@ class Plane:
         return any(self.is_same_plane_as(plane) for plane in plane_list)
 
     def indices_separate(self, points, dist_tolerance):
-        """
-        Returns three lists containing the indices of the points lying on one side of the plane, on the plane
+        """Get three lists containing the indices of the points lying on one side of the plane, on the plane
         and on the other side of the plane. The dist_tolerance parameter controls the tolerance to which a point
         is considered to lie on the plane or not (distance to the plane)
 
@@ -779,8 +776,7 @@ class Plane:
         return [side1, inplane, side2]
 
     def distance_to_point(self, point):
-        """
-        Computes the absolute distance from the plane to the point
+        """Compute the absolute distance from the plane to the point
 
         Args:
             point: Point for which distance is computed
@@ -791,9 +787,8 @@ class Plane:
         return np.abs(np.dot(self.normal_vector, point) + self.d)
 
     def distances(self, points):
-        """
-        Computes the distances from the plane to each of the points. Positive distances are on the side of the
-        normal of the plane while negative distances are on the other side
+        """Compute the distances from the plane to each of the points. Positive distances are on
+        the side of the normal of the plane while negative distances are on the other side.
 
         Args:
             points: Points for which distances are computed
@@ -805,10 +800,9 @@ class Plane:
         return [np.dot(self.normal_vector, pp) + self.d for pp in points]
 
     def distances_indices_sorted(self, points, sign=False):
-        """
-        Computes the distances from the plane to each of the points. Positive distances are on the side of the
-        normal of the plane while negative distances are on the other side. Indices sorting the points from closest
-        to furthest is also computed.
+        """Compute the distances from the plane to each of the points. Positive distances are
+        on the side of the normal of the plane while negative distances are on the other
+        side. Indices sorting the points from closest to furthest is also computed.
 
         Args:
             points: Points for which distances are computed
@@ -826,8 +820,7 @@ class Plane:
         return distances, indices
 
     def distances_indices_groups(self, points, delta=None, delta_factor=0.05, sign=False):
-        """
-        Computes the distances from the plane to each of the points. Positive distances are on the side of the
+        """Compute the distances from the plane to each of the points. Positive distances are on the side of the
         normal of the plane while negative distances are on the other side. Indices sorting the points from closest
         to furthest is also computed. Grouped indices are also given, for which indices of the distances that are
         separated by less than delta are grouped together. The delta parameter is either set explicitly or taken as
@@ -872,8 +865,7 @@ class Plane:
         return [pp - np.dot(pp - self.p1, self.normal_vector) * self.normal_vector for pp in pps]
 
     def orthonormal_vectors(self):
-        """
-        Returns a list of three orthogonal vectors, the two first being parallel to the plane and the
+        """Get a list of three orthogonal vectors, the two first being parallel to the plane and the
         third one is the normal vector of the plane
 
         Returns:
@@ -916,7 +908,7 @@ class Plane:
         xypps = []
         for pp in proj:
             xyzpp = np.dot(pp, PP)
-            xypps.append(xyzpp[0:2])
+            xypps.append(xyzpp[:2])
         if str(plane_center) == "mean":
             mean = np.zeros(2, float)
             for pp in xypps:
@@ -925,7 +917,7 @@ class Plane:
             xypps = [pp - mean for pp in xypps]
         elif plane_center is not None:
             projected_plane_center = self.projectionpoints([plane_center])[0]
-            xy_projected_plane_center = np.dot(projected_plane_center, PP)[0:2]
+            xy_projected_plane_center = np.dot(projected_plane_center, PP)[:2]
             xypps = [pp - xy_projected_plane_center for pp in xypps]
         return xypps
 
@@ -969,26 +961,13 @@ class Plane:
 
     @property
     def coefficients(self):
-        """Return a copy of the plane coefficients.
-
-        Returns:
-            Plane coefficients as a numpy array.
-        """
+        """A copy of the plane coefficients as a numpy array."""
         return np.copy(self._coefficients)
 
     @property
     def abcd(self):
-        """Return a tuple with the plane coefficients.
-
-        Returns:
-            Tuple with the plane coefficients.
-        """
-        return (
-            self._coefficients[0],
-            self._coefficients[1],
-            self._coefficients[2],
-            self._coefficients[3],
-        )
+        """A tuple with the plane coefficients."""
+        return tuple(self._coefficients[:4])
 
     @property
     def a(self):
@@ -1022,7 +1001,7 @@ class Plane:
 
     @classmethod
     def from_2points_and_origin(cls, p1, p2) -> Self:
-        """Initializes plane from two points and the origin.
+        """Initialize plane from two points and the origin.
 
         Args:
             p1: First point.
@@ -1035,7 +1014,7 @@ class Plane:
 
     @classmethod
     def from_3points(cls, p1, p2, p3) -> Self:
-        """Initializes plane from three points.
+        """Initialize plane from three points.
 
         Args:
             p1: First point.
@@ -1056,7 +1035,7 @@ class Plane:
 
     @classmethod
     def from_npoints(cls, points, best_fit="least_square_distance") -> Self:
-        """Initializes plane from a list of points.
+        """Initialize plane from a list of points.
 
         If the number of points is larger than 3, will use a least square fitting or max distance fitting.
 
@@ -1080,7 +1059,7 @@ class Plane:
 
     @classmethod
     def from_npoints_least_square_distance(cls, points) -> Self:
-        """Initializes plane from a list of points using a least square fitting procedure.
+        """Initialize plane from a list of points using a least square fitting procedure.
 
         Args:
             points: List of points.
@@ -1125,7 +1104,7 @@ class Plane:
 
     @classmethod
     def from_npoints_maximum_distance(cls, points) -> Self:
-        """Initializes plane from a list of points using a max distance fitting procedure.
+        """Initialize plane from a list of points using a max distance fitting procedure.
 
         Args:
             points: List of points.

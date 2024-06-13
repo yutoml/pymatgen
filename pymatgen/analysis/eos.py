@@ -19,12 +19,14 @@ from pymatgen.core.units import FloatWithUnit
 from pymatgen.util.plotting import add_fig_kwargs, get_ax_fig, pretty_plot
 
 if TYPE_CHECKING:
+    from typing import ClassVar
+
     import matplotlib.pyplot as plt
 
 __author__ = "Kiran Mathew, gmatteo"
 __credits__ = "Cormac Toher"
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 class EOSBase(ABC):
@@ -124,45 +126,33 @@ class EOSBase(ABC):
         return self.func(volume)
 
     @property
-    def e0(self):
-        """Returns the min energy."""
+    def e0(self) -> float:
+        """The min energy."""
         return self._params[0]
 
     @property
-    def b0(self):
-        """
-        Returns the bulk modulus.
-        Note: the units for the bulk modulus: unit of energy/unit of volume^3.
-        """
+    def b0(self) -> float:
+        """The bulk modulus in units of energy/unit of volume^3."""
         return self._params[1]
 
     @property
-    def b0_GPa(self):
-        """
-        Returns the bulk modulus in GPa.
-        Note: This assumes that the energy and volumes are in eV and Ang^3
-            respectively.
-        """
+    def b0_GPa(self) -> FloatWithUnit:
+        """The bulk modulus in GPa. This assumes the energy and volumes are in eV and Ang^3."""
         return FloatWithUnit(self.b0, "eV ang^-3").to("GPa")
 
     @property
     def b1(self):
-        """Returns the derivative of bulk modulus w.r.t. pressure(dimensionless)."""
+        """The derivative of bulk modulus w.r.t. pressure(dimensionless)."""
         return self._params[2]
 
     @property
     def v0(self):
-        """Returns the minimum or the reference volume in Ang^3."""
+        """The minimum or the reference volume in Ang^3."""
         return self._params[3]
 
     @property
     def results(self):
-        """
-        Returns a summary dict.
-
-        Returns:
-            dict
-        """
+        """A summary dict."""
         return {"e0": self.e0, "b0": self.b0, "b1": self.b1, "v0": self.v0}
 
     def plot(self, width=8, height=None, ax: plt.Axes = None, dpi=None, **kwargs):
@@ -285,8 +275,7 @@ class Birch(EOSBase):
     """Birch EOS."""
 
     def _func(self, volume, params):
-        """
-        From Intermetallic compounds: Principles and Practice, Vol. I:
+        """From Intermetallic compounds: Principles and Practice, Vol. I:
         Principles Chapter 9 pages 195-210 by M. Mehl. B. Klein,
         D. Papaconstantopoulos.
         case where n=0.
@@ -310,7 +299,7 @@ class BirchMurnaghan(EOSBase):
 
 
 class PourierTarantola(EOSBase):
-    """PourierTarantola EOS."""
+    """Pourier-Tarantola EOS."""
 
     def _func(self, volume, params):
         """Pourier-Tarantola equation from PRB 70, 224107."""
@@ -414,8 +403,7 @@ class NumericalEOS(PolynomialEOS):
     """A numerical EOS."""
 
     def fit(self, min_ndata_factor=3, max_poly_order_factor=5, min_poly_order=2):
-        """
-        Fit the input data to the 'numerical eos', the equation of state employed
+        """Fit the input data to the 'numerical eos', the equation of state employed
         in the quasiharmonic Debye model described in the paper:
         10.1103/PhysRevB.90.174107.
 
@@ -546,7 +534,7 @@ class EOS:
        eos_fit.plot()
     """
 
-    MODELS = dict(
+    MODELS: ClassVar = dict(
         murnaghan=Murnaghan,
         birch=Birch,
         birch_murnaghan=BirchMurnaghan,
@@ -570,8 +558,7 @@ class EOS:
         self.model = self.MODELS[eos_name]
 
     def fit(self, volumes, energies):
-        """
-        Fit energies as function of volumes.
+        """Fit energies as function of volumes.
 
         Args:
             volumes (list/np.array)

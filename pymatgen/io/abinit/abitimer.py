@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def alternate(*iterables):
     """
     [a[0], b[0], ... , a[1], b[1], ..., a[n], b[n] ...]
-    >>> alternate([1,4], [2,5], [3,6])
+    >>> alternate([1, 4], [2, 5], [3, 6])
     [1, 2, 3, 4, 5, 6].
     """
     items = []
@@ -62,8 +62,7 @@ class AbinitTimerParser(collections.abc.Iterable):
 
     @classmethod
     def walk(cls, top=".", ext=".abo"):
-        """
-        Scan directory tree starting from top, look for files with extension `ext` and
+        """Scan directory tree starting from top, look for files with extension `ext` and
         parse timing data.
 
         Returns:
@@ -83,13 +82,12 @@ class AbinitTimerParser(collections.abc.Iterable):
         return parser, paths, ok_files
 
     def __init__(self):
-        """Initialize object."""
         # List of files that have been parsed.
-        self._filenames = []
+        self._filenames: list = []
 
         # timers[filename][mpi_rank]
         # contains the timer extracted from the file filename associated to the MPI rank mpi_rank.
-        self._timers = {}
+        self._timers: dict = {}
 
     def __iter__(self):
         return iter(self._timers)
@@ -211,8 +209,7 @@ class AbinitTimerParser(collections.abc.Iterable):
         return [self._timers[filename][mpi_rank] for filename in self._filenames]
 
     def section_names(self, ordkey="wall_time"):
-        """
-        Return the names of sections ordered by ordkey.
+        """Get the names of sections ordered by ordkey.
         For the time being, the values are taken from the first timer.
         """
         section_names = []
@@ -234,8 +231,7 @@ class AbinitTimerParser(collections.abc.Iterable):
         return section_names
 
     def get_sections(self, section_name):
-        """
-        Return the list of sections stored in self.timers() given `section_name`
+        """Get the list of sections stored in self.timers() given `section_name`
         A fake section is returned if the timer does not have section_name.
         """
         sections = []
@@ -525,8 +521,7 @@ class ParallelEfficiency(dict):
         return tuple(sect_name for (sect_name, e) in data)
 
     def totable(self, stop=None, reverse=True):
-        """
-        Return table (list of lists) with timing results.
+        """Get table (list of lists) with timing results.
 
         Args:
             stop: Include results up to stop. None for all
@@ -599,11 +594,11 @@ class AbinitTimerSection:
         self.gflops = float(gflops)
 
     def to_tuple(self):
-        """Convert object to tuple."""
+        """Get the values as a tuple."""
         return tuple(self.__dict__[at] for at in AbinitTimerSection.FIELDS)
 
     def to_dict(self):
-        """Convert object to dictionary."""
+        """Get the values as a dictionary."""
         return {at: self.__dict__[at] for at in AbinitTimerSection.FIELDS}
 
     def to_csvline(self, with_header=False):
@@ -727,8 +722,7 @@ class AbinitTimer:
         return values
 
     def names_and_values(self, key, minval=None, minfract=None, sorted=True):
-        """
-        Select the entries whose value[key] is >= minval or whose fraction[key] is >= minfract
+        """Select the entries whose value[key] is >= minval or whose fraction[key] is >= minfract
         Return the names of the sections and the corresponding values.
         """
         values = self.get_values(key)
@@ -845,8 +839,7 @@ class AbinitTimer:
 
     @add_fig_kwargs
     def scatter_hist(self, ax: plt.Axes = None, **kwargs):
-        """
-        Scatter plot + histogram.
+        """Scatter plot + histogram.
 
         Args:
             ax: matplotlib Axes or None if a new figure should be created.

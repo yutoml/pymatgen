@@ -33,13 +33,12 @@ __date__ = "June 23, 2016"
 
 
 class Xr:
-    """Basic object for working with xr files."""
+    """For working with XR files."""
 
     def __init__(self, structure: Structure):
         """
         Args:
-            structure (Structure/IStructure): Structure object to create the
-                    Xr object.
+            structure (Structure/IStructure): Structure object to create the Xr object.
         """
         if not structure.is_ordered:
             raise ValueError("Xr file can only be constructed from ordered structure")
@@ -65,8 +64,7 @@ class Xr:
         return "\n".join(output)
 
     def write_file(self, filename: str | Path) -> None:
-        """
-        Write out an xr file.
+        """Write out an xr file.
 
         Args:
             filename (str): name of the file to write to.
@@ -96,7 +94,7 @@ class Xr:
         tokens = lines[0].split()
         lengths = [float(tokens[i]) for i in range(1, len(tokens))]
         tokens = lines[1].split()
-        angles = [float(i) for i in tokens[0:3]]
+        angles = [float(i) for i in tokens[:3]]
         tokens = lines[2].split()
         n_sites = int(tokens[0])
         mat = np.zeros((3, 3), dtype=float)

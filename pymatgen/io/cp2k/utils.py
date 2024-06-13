@@ -87,7 +87,7 @@ def preprocessor(data: str, dir: str = ".") -> str:
         assert len(v) == 3  # @SET VAR value
         var, value = v[1:]
         data = re.sub(rf"{match}", "", data)
-        data = re.sub(r"\${?" + var + "}?", value, data)
+        data = re.sub(rf"\${{?{var}}}?", value, data)
 
     c1 = re.findall(r"@IF", data, re.IGNORECASE)
     c2 = re.findall(r"@ELIF", data, re.IGNORECASE)
@@ -121,8 +121,7 @@ def natural_keys(text: str):
 
 
 def get_unique_site_indices(struct: Structure | Molecule):
-    """
-    Get unique site indices for a structure according to site properties. Whatever site-property
+    """Get unique site indices for a structure according to site properties. Whatever site-property
     has the most unique values is used for indexing.
 
     For example, if you have magnetic CoO with half Co atoms having a positive moment, and the

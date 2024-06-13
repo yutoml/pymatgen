@@ -13,7 +13,7 @@ import math
 import os
 import warnings
 from itertools import combinations
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from monty.json import MontyDecoder, MontyEncoder, MSONable
@@ -25,6 +25,8 @@ from pymatgen.entries import Entry
 from pymatgen.util.due import Doi, due
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     from typing_extensions import Self
 
     from pymatgen.core import Structure
@@ -70,12 +72,12 @@ class EnergyAdjustment(MSONable):
 
     @property
     def value(self):
-        """Return the value of the energy correction in eV."""
+        """The value of the energy correction in eV."""
         return self._value
 
     @property
     def uncertainty(self):
-        """Return the uncertainty in the value of the energy adjustment in eV."""
+        """The uncertainty in the value of the energy adjustment in eV."""
         return self._uncertainty
 
     @abc.abstractmethod
@@ -129,7 +131,7 @@ class ConstantEnergyAdjustment(EnergyAdjustment):
 
     @property
     def explain(self):
-        """Return an explanation of how the energy adjustment is calculated."""
+        """An explanation of how the energy adjustment is calculated."""
         return f"{self.description} ({self.value:.3f} eV)"
 
     def normalize(self, factor: float) -> None:
@@ -191,17 +193,17 @@ class CompositionEnergyAdjustment(EnergyAdjustment):
 
     @property
     def value(self):
-        """Return the value of the energy adjustment in eV."""
+        """The value of the energy adjustment in eV."""
         return self._adj_per_atom * self.n_atoms
 
     @property
     def uncertainty(self):
-        """Return the value of the energy adjustment in eV."""
+        """The value of the energy adjustment in eV."""
         return self.uncertainty_per_atom * self.n_atoms
 
     @property
     def explain(self):
-        """Return an explanation of how the energy adjustment is calculated."""
+        """An explanation of how the energy adjustment is calculated."""
         return f"{self.description} ({self._adj_per_atom:.3f} eV/atom x {self.n_atoms} atoms)"
 
     def normalize(self, factor: float) -> None:
@@ -252,17 +254,17 @@ class TemperatureEnergyAdjustment(EnergyAdjustment):
 
     @property
     def value(self):
-        """Return the value of the energy correction in eV."""
+        """The value of the energy correction in eV."""
         return self._adj_per_deg * self.temp * self.n_atoms
 
     @property
     def uncertainty(self):
-        """Return the value of the energy adjustment in eV."""
+        """The value of the energy adjustment in eV."""
         return self.uncertainty_per_deg * self.temp * self.n_atoms
 
     @property
     def explain(self):
-        """Return an explanation of how the energy adjustment is calculated."""
+        """An explanation of how the energy adjustment is calculated."""
         return f"{self.description} ({self._adj_per_deg:.4f} eV/K/atom x {self.temp} K x {self.n_atoms} atoms)"
 
     def normalize(self, factor: float) -> None:
@@ -289,9 +291,9 @@ class ComputedEntry(Entry):
         energy_adjustments: list | None = None,
         parameters: dict | None = None,
         data: dict | None = None,
-        entry_id: object | None = None,
+        entry_id: str | None = None,
     ):
-        """Initializes a ComputedEntry.
+        """Initialize a ComputedEntry.
 
         Args:
             composition (Composition): Composition of the entry. For
@@ -468,11 +470,8 @@ class ComputedEntry(Entry):
         if not math.isclose(self.energy, other.energy):
             return False
 
-        if self.composition != other.composition:
-            return False
-
         # assumes that data, parameters are equivalent
-        return True
+        return self.composition == other.composition
 
     @classmethod
     def from_dict(cls, dct: dict) -> Self:
@@ -530,7 +529,7 @@ class ComputedEntry(Entry):
         return super().__hash__()
 
     def copy(self) -> ComputedEntry:
-        """Returns a copy of the ComputedEntry."""
+        """Get a copy of the ComputedEntry."""
         return ComputedEntry(
             composition=self.composition,
             energy=self.uncorrected_energy,
@@ -555,9 +554,9 @@ class ComputedStructureEntry(ComputedEntry):
         energy_adjustments: list | None = None,
         parameters: dict | None = None,
         data: dict | None = None,
-        entry_id: object | None = None,
+        entry_id: str | None = None,
     ) -> None:
-        """Initializes a ComputedStructureEntry.
+        """Initialize a ComputedStructureEntry.
 
         Args:
             structure (Structure): The actual structure of an entry.
@@ -611,7 +610,7 @@ class ComputedStructureEntry(ComputedEntry):
         return dct
 
     @classmethod
-    def from_dict(cls, dct) -> Self:
+    def from_dict(cls, dct: dict) -> Self:
         """
         Args:
             dct (dict): Dict representation.
@@ -645,7 +644,10 @@ class ComputedStructureEntry(ComputedEntry):
             entry_id=dct.get("entry_id"),
         )
 
-    def normalize(self, mode: Literal["formula_unit", "atom"] = "formula_unit") -> ComputedStructureEntry:
+    def normalize(
+        self,
+        mode: Literal["formula_unit", "atom"] = "formula_unit",
+    ) -> ComputedStructureEntry:
         """Normalize the entry's composition and energy. The structure remains unchanged.
 
         Args:
@@ -668,7 +670,7 @@ class ComputedStructureEntry(ComputedEntry):
         return entry
 
     def copy(self) -> ComputedStructureEntry:
-        """Returns a copy of the ComputedStructureEntry."""
+        """Get a copy of the ComputedStructureEntry."""
         return ComputedStructureEntry(
             structure=self.structure.copy(),
             energy=self.uncorrected_energy,
@@ -696,7 +698,7 @@ class GibbsComputedStructureEntry(ComputedStructureEntry):
         energy_adjustments: list | None = None,
         parameters: dict | None = None,
         data: dict | None = None,
-        entry_id: object | None = None,
+        entry_id: str | None = None,
     ):
         """
         Args:
@@ -776,7 +778,7 @@ class GibbsComputedStructureEntry(ComputedStructureEntry):
 
         Returns:
             float: the difference between formation enthalpy (T=0 K, Materials
-            Project) and the predicted Gibbs free energy of formation  (eV)
+            Project) and the predicted Gibbs free energy of formation (eV)
         """
         comp = self.composition
 
@@ -944,7 +946,7 @@ class GibbsComputedStructureEntry(ComputedStructureEntry):
         return dct
 
     @classmethod
-    def from_dict(cls, dct) -> Self:
+    def from_dict(cls, dct: dict) -> Self:
         """
         Args:
             dct (dict): Dict representation.

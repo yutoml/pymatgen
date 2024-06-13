@@ -22,7 +22,7 @@ from glob import glob
 from pathlib import Path
 from shutil import which
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from monty.dev import deprecated
@@ -34,6 +34,8 @@ from pymatgen.io.vasp.inputs import Potcar
 from pymatgen.io.vasp.outputs import Chgcar
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from typing_extensions import Self
 
     from pymatgen.core import Structure
@@ -47,7 +49,7 @@ __date__ = "4/5/13"
 
 
 class BaderAnalysis:
-    """Performs Bader charge analysis for Cube files or VASP outputs.
+    """Perform Bader charge analysis for Cube files or VASP outputs.
 
     Attributes:
         data (list[dict]): Atomic data parsed from bader analysis.
@@ -73,7 +75,7 @@ class BaderAnalysis:
         bader_path: str | None = None,
         parse_atomic_densities: bool = False,
     ) -> None:
-        """Initializes the Bader caller.
+        """Initialize the Bader caller.
 
         Args:
             chgcar_filename (str): The filename of the CHGCAR.
@@ -231,9 +233,8 @@ class BaderAnalysis:
         return data
 
     @deprecated(
-        message="parse_atomic_densities was deprecated on 2024-02-26 "
-        "and will be removed on 2025-02-26.\nSee https://"
-        "github.com/materialsproject/pymatgen/issues/3652 for details."
+        message="See issue #3652 for details.",
+        deadline=(2025, 2, 26),
     )
     def _parse_atomic_densities(self) -> list[dict]:
         """Parse atom-centered charge densities with excess zeros removed.
@@ -319,7 +320,7 @@ class BaderAnalysis:
         return self.data[atom_index]["charge"]
 
     def get_charge_transfer(self, atom_index: int, nelect: int | None = None) -> float:
-        """Returns the charge transferred for a particular atom. A positive value means
+        """Get the charge transferred for a particular atom. A positive value means
         that the site has gained electron density (i.e. exhibits anionic character)
         whereas a negative value means the site has lost electron density (i.e. exhibits
         cationic character). If the arg nelect is not supplied, then POTCAR must be
@@ -357,7 +358,7 @@ class BaderAnalysis:
         return -self.get_charge_transfer(atom_index, nelect)
 
     def get_charge_decorated_structure(self) -> Structure:
-        """Returns a charge decorated structure.
+        """Get a charge decorated structure.
 
         Note, this assumes that the Bader analysis was correctly performed on a file
         with electron densities
@@ -368,7 +369,7 @@ class BaderAnalysis:
         return struct
 
     def get_oxidation_state_decorated_structure(self, nelects: list[int] | None = None) -> Structure:
-        """Returns an oxidation state decorated structure based on bader analysis results.
+        """Get an oxidation state decorated structure based on bader analysis results.
         Each site is assigned a charge based on the computed partial atomic charge from bader.
 
         Note, this assumes that the Bader analysis was correctly performed on a file
@@ -422,7 +423,7 @@ class BaderAnalysis:
 
     @property
     def summary(self) -> dict[str, Any]:
-        """Dict summary of key analysis, e.g., atomic volume, charge, etc."""
+        """Dict summary of key analysis, e.g. atomic volume, charge, etc."""
         summary = {
             "min_dist": [d["min_dist"] for d in self.data],
             "charge": [d["charge"] for d in self.data],
@@ -497,7 +498,7 @@ class BaderAnalysis:
         )
 
 
-def bader_analysis_from_path(path: str, suffix: str = ""):
+def bader_analysis_from_path(path: str, suffix: str = "") -> dict[str, Any]:
     """Convenience method to run Bader analysis on a folder containing
     typical VASP output files.
 
@@ -533,8 +534,9 @@ def bader_analysis_from_path(path: str, suffix: str = ""):
         return paths[0]
 
     chgcar_path = _get_filepath("CHGCAR", "Could not find CHGCAR!")
-    if chgcar_path is not None:
-        chgcar = Chgcar.from_file(chgcar_path)
+    if chgcar_path is None:
+        raise FileNotFoundError("Could not find CHGCAR!")
+    chgcar = Chgcar.from_file(chgcar_path)
 
     aeccar0_path = _get_filepath("AECCAR0")
     if not aeccar0_path:
@@ -559,7 +561,7 @@ def bader_analysis_from_objects(
     potcar: Potcar | None = None,
     aeccar0: Chgcar | None = None,
     aeccar2: Chgcar | None = None,
-):
+) -> dict[str, Any]:
     """Convenience method to run Bader analysis from a set
     of pymatgen Chgcar and Potcar objects.
 

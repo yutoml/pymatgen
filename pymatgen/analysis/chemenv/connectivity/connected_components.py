@@ -192,7 +192,7 @@ def make_supergraph(graph, multiplicity, periodicity_vectors):
 
 
 class ConnectedComponent(MSONable):
-    """Class used to describe the connected components in a structure in terms of coordination environments."""
+    """Describe the connected components in a structure in terms of coordination environments."""
 
     def __init__(
         self,
@@ -554,11 +554,8 @@ class ConnectedComponent(MSONable):
 
     @property
     def graph(self):
-        """Return the graph of this connected component.
-
-        Returns:
-            MultiGraph: Networkx MultiGraph object with environment as nodes and links between these nodes as edges
-                with information about the image cell difference if any.
+        """The Networkx MultiGraph object of this connected component with environment as nodes and links
+        between these nodes as edges with information about the image cell difference if any.
         """
         return self._connected_subgraph
 
@@ -625,14 +622,14 @@ class ConnectedComponent(MSONable):
 
     @property
     def periodicity_vectors(self):
-        """Get periodicity vectors of this connected component."""
+        """Periodicity vectors of this connected component."""
         if self._periodicity_vectors is None:
             self.compute_periodicity()
         return [np.array(pp) for pp in self._periodicity_vectors]
 
     @property
     def periodicity(self):
-        """Get periodicity of this connected component."""
+        """Periodicity of this connected component."""
         if self._periodicity_vectors is None:
             self.compute_periodicity()
         return f"{len(self._periodicity_vectors)}D"

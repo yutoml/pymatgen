@@ -54,13 +54,12 @@ class AbstractFeffInputSet(MSONable, abc.ABC):
 
     @abc.abstractmethod
     def header(self):
-        """Returns header to be used in feff.inp file from a pymatgen structure."""
+        """Get header to be used in feff.inp file from a pymatgen structure."""
 
     @property
     @abc.abstractmethod
     def atoms(self):
-        """
-        Returns Atoms string from a structure that goes in feff.inp file.
+        """Get Atoms string from a structure that goes in feff.inp file.
 
         Returns:
             Atoms object.
@@ -69,16 +68,16 @@ class AbstractFeffInputSet(MSONable, abc.ABC):
     @property
     @abc.abstractmethod
     def tags(self):
-        """Returns standard calculation parameters."""
+        """Get standard calculation parameters."""
         return
 
     @property
     @abc.abstractmethod
     def potential(self):
-        """Returns POTENTIAL section used in feff.inp from a structure."""
+        """Get POTENTIAL section used in feff.inp from a structure."""
 
     def all_input(self):
-        """Returns all input files as a dict of {filename: feffio object}."""
+        """Get all input files as a dict of {filename: feffio object}."""
         dct = {"HEADER": self.header(), "PARAMETERS": self.tags}
 
         if "RECIPROCAL" not in self.tags:
@@ -87,8 +86,7 @@ class AbstractFeffInputSet(MSONable, abc.ABC):
         return dct
 
     def write_input(self, output_dir=".", make_dir_if_not_present=True):
-        """
-        Writes a set of FEFF input to a directory.
+        """Write a FEFF input set to a directory.
 
         Args:
             output_dir: Directory to output the FEFF input files
@@ -163,7 +161,7 @@ class FEFFDictSet(AbstractFeffInputSet):
 
                     being written to the input file.
             spacegroup_analyzer_settings (dict): parameters passed to SpacegroupAnalyzer.
-                E.g., {"symprec": 0.01, "angle_tolerance": 4}
+                e.g. {"symprec": 0.01, "angle_tolerance": 4}
         """
         self.absorbing_atom = absorbing_atom
         self.user_tag_settings = user_tag_settings or {}
@@ -233,8 +231,7 @@ class FEFFDictSet(AbstractFeffInputSet):
 
     @property
     def tags(self) -> Tags:
-        """
-        FEFF job parameters.
+        """FEFF job parameters.
 
         Returns:
             Tags
@@ -261,8 +258,7 @@ class FEFFDictSet(AbstractFeffInputSet):
 
     @property
     def potential(self) -> Potential:
-        """
-        FEFF potential.
+        """FEFF potential.
 
         Returns:
             Potential

@@ -9,7 +9,6 @@ https://materialsproject.org/dashboard.
 
 from __future__ import annotations
 
-import collections
 import itertools
 import json
 import logging
@@ -17,7 +16,7 @@ import os
 import platform
 import sys
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import requests
 from monty.json import MontyDecoder
@@ -27,6 +26,8 @@ from pymatgen.core import __version__ as PMG_VERSION
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 if TYPE_CHECKING:
+    from typing import Callable
+
     from mp_api.client import MPRester as _MPResterNew
     from typing_extensions import Self
 
@@ -88,7 +89,9 @@ class _MPResterBasic:
             self.session.headers["user-agent"] = f"{pymatgen_info} ({python_info} {platform_info})"
 
         # This is a hack, but it fakes most of the functionality of mp-api's summary.search.
-        Summary = collections.namedtuple("Summary", "search")
+        class Summary(NamedTuple):
+            search: Callable
+
         self.summary = Summary(self.summary_search)
 
     def __getattr__(self, item):
@@ -154,11 +157,10 @@ class _MPResterBasic:
         return self.request(f"materials/summary/?{get}", payload=criteria)
 
     def get_summary(self, criteria: dict, fields: list | None = None) -> list[dict]:
-        """
-        Get a data corresponding to a criteria.
+        """Get  a data corresponding to a criteria.
 
         Args:
-            criteria (dict): Materials Project ID (e.g. mp-1234), e.g., {"formula": "Fe2O3,FeO"}
+            criteria (dict): Materials Project ID (e.g. mp-1234), e.g. {"formula": "Fe2O3,FeO"}
             fields (list): Fields to query for. If None (the default), all fields are returned.
 
         Returns:
@@ -168,8 +170,7 @@ class _MPResterBasic:
         return self.request(f"materials/summary/?{get}", payload=criteria)
 
     def get_summary_by_material_id(self, material_id: str, fields: list | None = None) -> dict:
-        """
-        Get a data corresponding to a material_id.
+        """Get  a data corresponding to a material_id.
 
         Args:
             material_id (str): Materials Project ID (e.g. mp-1234).
@@ -184,8 +185,7 @@ class _MPResterBasic:
     get_doc = get_summary_by_material_id
 
     def get_material_ids(self, formula):
-        """
-        Get all materials ids for a formula.
+        """Get  all materials ids for a formula.
 
         Args:
             formula (str): A formula (e.g., Fe2O3).
@@ -217,8 +217,7 @@ class _MPResterBasic:
         return [dct[prop] for dct in response]
 
     def get_structure_by_material_id(self, material_id: str, conventional_unit_cell: bool = False) -> Structure:
-        """
-        Get a Structure corresponding to a material_id.
+        """Get  a Structure corresponding to a material_id.
 
         Args:
             material_id (str): Materials Project ID (e.g. mp-1234).
@@ -230,7 +229,7 @@ class _MPResterBasic:
             Structure object.
         """
         prop = "structure"
-        response = self.request(f"materials/summary/{material_id}/?_fields={prop}")
+        response = self.request(f"materials/summary?material_ids={material_id}&_fields={prop}")
         structure = response[0][prop]
         if conventional_unit_cell:
             return SpacegroupAnalyzer(structure).get_conventional_standard_structure()
@@ -239,8 +238,7 @@ class _MPResterBasic:
     def get_initial_structures_by_material_id(
         self, material_id: str, conventional_unit_cell: bool = False
     ) -> list[Structure]:
-        """
-        Get a Structure corresponding to a material_id.
+        """Get  a Structure corresponding to a material_id.
 
         Args:
             material_id (str): Materials Project ID (e.g. mp-1234).
@@ -267,8 +265,7 @@ class _MPResterBasic:
         conventional_unit_cell=False,
         sort_by_e_above_hull=False,
     ):
-        """
-        Get a list of ComputedEntries or ComputedStructureEntries corresponding
+        """Get  a list of ComputedEntries or ComputedStructureEntries corresponding
         to a chemical system, formula, or materials_id or full criteria.
 
         Args:
@@ -317,12 +314,11 @@ class _MPResterBasic:
         return list(set(entries))
 
     def get_entry_by_material_id(self, material_id: str, *args, **kwargs) -> ComputedStructureEntry:
-        r"""
-        Get a ComputedEntry corresponding to a material_id.
+        r"""Get  a ComputedEntry corresponding to a material_id.
 
         Args:
             material_id (str): Materials Project material_id (a string,
-                e.g., mp-1234).
+                e.g. mp-1234).
             *args: Pass-through to get_entries.
             **kwargs: Pass-through to get_entries.
 
@@ -339,8 +335,8 @@ class _MPResterBasic:
 
         Args:
             elements (str or [str]): Chemical system string comprising element
-                symbols separated by dashes, e.g., "Li-Fe-O" or List of element
-                symbols, e.g., ["Li", "Fe", "O"].
+                symbols separated by dashes, e.g. "Li-Fe-O" or List of element
+                symbols, e.g. ["Li", "Fe", "O"].
             *args: Pass-through to get_entries.
             **kwargs: Pass-through to get_entries.
 

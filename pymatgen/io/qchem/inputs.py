@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from monty.io import zopen
 
@@ -15,6 +15,7 @@ from .utils import lower_and_check_unique, read_pattern, read_table_pattern
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Literal
 
     from typing_extensions import Self
 
@@ -243,8 +244,8 @@ class QCInput(InputFile):
         """Return a string representation of an entire input file."""
         return str(self)
 
-    def __str__(self):
-        combined_list = []
+    def __str__(self) -> str:
+        combined_list: list = []
         # molecule section
         combined_list.extend((self.molecule_template(self.molecule), "", self.rem_template(self.rem), ""))
         # opt section
@@ -369,8 +370,7 @@ class QCInput(InputFile):
 
     @staticmethod
     def write_multi_job_file(job_list: list[QCInput], filename: str):
-        """
-        Write a multijob file.
+        """Write a multijob file.
 
         Args:
             job_list (): List of jobs.
@@ -512,8 +512,7 @@ class QCInput(InputFile):
 
     @staticmethod
     def solvent_template(solvent: dict) -> str:
-        """
-        Solvent template.
+        """Solvent template.
 
         Args:
             solvent ():
@@ -552,13 +551,11 @@ class QCInput(InputFile):
 
     @staticmethod
     def scan_template(scan: dict[str, list]) -> str:
-        """
+        """Get string representing Q-Chem input format for scan section.
+
         Args:
             scan (dict): Dictionary with scan section information.
                 Ex: {"stre": ["3 6 1.5 1.9 0.1"], "tors": ["1 2 3 4 -180 180 15"]}.
-
-        Returns:
-            String representing Q-Chem input format for scan section
         """
         scan_list = []
         scan_list.append("$scan")
@@ -587,7 +584,7 @@ class QCInput(InputFile):
                 **NOTE: keys must be given as strings even though they are numbers!**.
 
         Returns:
-            String representing Q-Chem input format for van_der_waals section
+            str: representing Q-Chem input format for van_der_waals section
         """
         vdw_list = []
         vdw_list.append("$van_der_waals")
@@ -612,12 +609,11 @@ class QCInput(InputFile):
         Returns:
             str: Plots section.
         """
-        plots_list = []
-        plots_list.append("$plots")
+        out = ["$plots"]
         for key, value in plots.items():
-            plots_list.append(f"   {key} {value}")
-        plots_list.append("$end")
-        return "\n".join(plots_list)
+            out.append(f"   {key} {value}")
+        out += ["$end"]
+        return "\n".join(out)
 
     @staticmethod
     def nbo_template(nbo: dict) -> str:
@@ -767,19 +763,18 @@ class QCInput(InputFile):
                 because the non-electrostatic part of the CMIRS solvation model in Q-Chem
                 calls a secondary code.
         """
-        pcm_nonels_list = []
-        pcm_nonels_list.append("$pcm_nonels")
+        pcm_non_electros = []
+        pcm_non_electros.append("$pcm_nonels")
         for key, value in pcm_nonels.items():
             # if the value is None, don't write it to output
             if value is not None:
-                pcm_nonels_list.append(f"   {key} {value}")
-        pcm_nonels_list.append("$end")
-        return "\n".join(pcm_nonels_list)
+                pcm_non_electros.append(f"   {key} {value}")
+        pcm_non_electros.append("$end")
+        return "\n".join(pcm_non_electros)
 
     @staticmethod
     def find_sections(string: str) -> list:
-        """
-        Find sections in the string.
+        """Find sections in the string.
 
         Args:
             string (str): String
@@ -864,8 +859,7 @@ class QCInput(InputFile):
 
     @staticmethod
     def read_rem(string: str) -> dict:
-        """
-        Parse rem from string.
+        """Parse rem from string.
 
         Args:
             string (str): String

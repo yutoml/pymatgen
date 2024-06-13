@@ -19,7 +19,7 @@ If you want to implement a new InputGenerator, please take note of the following
    the "recipe", but nothing that is specific to a particular system. get_input_set
    takes system-specific information (such as structure) and applies the recipe.
 3. All InputGenerator must save all supplied args and kwargs as instance variables.
-   E.g., self.my_arg = my_arg and self.kwargs = kwargs in the __init__. This
+   e.g. self.my_arg = my_arg and self.kwargs = kwargs in the __init__. This
    ensures the as_dict and from_dict work correctly.
 """
 
@@ -64,8 +64,7 @@ class InputFile(MSONable):
         """Return a string representation of an entire input file."""
 
     def write_file(self, filename: str | PathLike) -> None:
-        """
-        Write the input file.
+        """Write the input file.
 
         Args:
             filename: The filename to output to, including path.
@@ -186,8 +185,7 @@ class InputSet(MSONable, MutableMapping):
         overwrite: bool = True,
         zip_inputs: bool = False,
     ):
-        """
-        Write Inputs to one or more files.
+        """Write Inputs to one or more files.
 
         Args:
             directory: Directory to write input files to
@@ -256,8 +254,7 @@ class InputGenerator(MSONable):
 
     @abc.abstractmethod
     def get_input_set(self, *args, **kwargs):
-        """
-        Generate an InputSet object. Typically the first argument to this method
+        """Generate an InputSet object. Typically the first argument to this method
         will be a Structure or other form of atomic coordinates.
         """
         raise NotImplementedError(f"get_input_set has not been implemented in {type(self).__name__}")

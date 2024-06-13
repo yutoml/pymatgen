@@ -67,9 +67,9 @@ class SymmetrizedStructure(Structure):
         self.wyckoff_letters = wyckoff_letters
         self.wyckoff_symbols = [f"{len(symb)}{symb[0]}" for symb in wyckoff_symbols]
 
-    def copy(self):
-        """Copy of structure."""
-        return SymmetrizedStructure(
+    def copy(self) -> Self:  # type: ignore[override]
+        """Make a copy of the SymmetrizedStructure."""
+        return type(self)(
             self,
             spacegroup=self.spacegroup,
             equivalent_positions=self.site_labels,
@@ -77,7 +77,7 @@ class SymmetrizedStructure(Structure):
         )
 
     def find_equivalent_sites(self, site: PeriodicSite) -> list[PeriodicSite]:
-        """Finds all symmetrically equivalent sites for a particular site.
+        """Find all symmetrically equivalent sites for a particular site.
 
         Args:
             site (PeriodicSite): A site in the structure

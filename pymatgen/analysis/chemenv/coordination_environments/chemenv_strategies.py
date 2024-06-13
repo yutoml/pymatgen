@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import abc
 import os
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import numpy as np
 from monty.json import MSONable
@@ -31,6 +31,8 @@ from pymatgen.core.sites import PeriodicSite
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 if TYPE_CHECKING:
+    from typing import ClassVar
+
     from typing_extensions import Self
 
 __author__ = "David Waroquiers"
@@ -194,13 +196,12 @@ class AdditionalConditionInt(int, StrategyOption):
 
 
 class AbstractChemenvStrategy(MSONable, abc.ABC):
-    """
-    Class used to define a Chemenv strategy for the neighbors and coordination environment to be applied to a
-    StructureEnvironments object.
+    """Base class to define a Chemenv strategy for the neighbors and coordination environment
+    to be applied to a StructureEnvironments object.
     """
 
     AC = AdditionalConditions()
-    STRATEGY_OPTIONS: ClassVar[dict[str, dict]] = dict()
+    STRATEGY_OPTIONS: ClassVar[dict[str, dict]] = {}
     STRATEGY_DESCRIPTION: str | None = None
     STRATEGY_INFO_FIELDS: ClassVar[list] = []
     DEFAULT_SYMMETRY_MEASURE_TYPE = "csm_wcs_ctwcc"
@@ -256,26 +257,29 @@ class AbstractChemenvStrategy(MSONable, abc.ABC):
             Equivalent site in the unit cell, translations and symmetry transformation.
         """
         # Get the index of the site in the unit cell of which the PeriodicSite psite is a replica.
+        site_idx = 0
         try:
-            isite = self.structure_environments.structure.index(psite)
+            site_idx = self.structure_environments.structure.index(psite)
         except ValueError:
             try:
                 uc_psite = psite.to_unit_cell()
-                isite = self.structure_environments.structure.index(uc_psite)
+                site_idx = self.structure_environments.structure.index(uc_psite)
             except ValueError:
                 for isite2, site2 in enumerate(self.structure_environments.structure):
                     if psite.is_periodic_image(site2):
-                        isite = isite2
+                        site_idx = isite2
                         break
         # Get the translation between psite and its corresponding site in the unit cell (Translation I)
-        this_site = self.structure_environments.structure[isite]
-        dthis_site = psite.frac_coords - this_site.frac_coords
+        this_site = self.structure_environments.structure[site_idx]
+        dist_this_site = psite.frac_coords - this_site.frac_coords
         # Get the translation between the equivalent site for which the neighbors have been computed and the site in
         # the unit cell that corresponds to psite (Translation II)
-        equiv_site = self.structure_environments.structure[self.structure_environments.sites_map[isite]].to_unit_cell()
+        equiv_site = self.structure_environments.structure[
+            self.structure_environments.sites_map[site_idx]
+        ].to_unit_cell()
         # equivsite = self.structure_environments.structure[self.structure_environments.sites_map[isite]]
-        dequivsite = (
-            self.structure_environments.structure[self.structure_environments.sites_map[isite]].frac_coords
+        dist_equiv_site = (
+            self.structure_environments.structure[self.structure_environments.sites_map[site_idx]].frac_coords
             - equiv_site.frac_coords
         )
         found = False
@@ -283,6 +287,8 @@ class AbstractChemenvStrategy(MSONable, abc.ABC):
         # that gets back the site to the unit cell (Translation III)
         # TODO: check that these tolerances are needed, now that the structures are refined before analyzing envs
         tolerances = [1e-8, 1e-7, 1e-6, 1e-5, 1e-4]
+        d_this_site2 = (0, 0, 0)
+        sym_trafo = None
         for tolerance in tolerances:
             for sym_op in self.symops:
                 new_site = PeriodicSite(
@@ -313,7 +319,9 @@ class AbstractChemenvStrategy(MSONable, abc.ABC):
                 break
         if not found:
             raise EquivalentSiteSearchError(psite)
-        return self.structure_environments.sites_map[isite], dequivsite, dthis_site + d_this_site2, sym_trafo
+
+        equivalent_site_map = self.structure_environments.sites_map[site_idx]
+        return equivalent_site_map, dist_equiv_site, dist_this_site + d_this_site2, sym_trafo
 
     @abc.abstractmethod
     def get_site_neighbors(self, site):
@@ -333,7 +341,7 @@ class AbstractChemenvStrategy(MSONable, abc.ABC):
 
     @property
     def uniquely_determines_coordination_environments(self):
-        """Returns True if the strategy leads to a unique coordination environment."""
+        """True if the strategy leads to a unique coordination environment."""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -404,19 +412,19 @@ class AbstractChemenvStrategy(MSONable, abc.ABC):
             The list of neighbors of the site. For complex strategies, where one allows multiple solutions, this
         can return a list of list of neighbors.
         """
-        isite, dequivsite, dthissite, mysym = self.equivalent_site_index_and_transform(site)
+        site_idx, dist_equiv_site, dist_this_site, mysym = self.equivalent_site_index_and_transform(site)
         geoms_and_maps_list = self.get_site_coordination_environments_fractions(
             site=site,
-            isite=isite,
-            dequivsite=dequivsite,
-            dthissite=dthissite,
+            isite=site_idx,
+            dequivsite=dist_equiv_site,
+            dthissite=dist_this_site,
             mysym=mysym,
             return_maps=True,
             return_strategy_dict_info=True,
         )
         if geoms_and_maps_list is None:
             return None
-        site_nbs_sets = self.structure_environments.neighbors_sets[isite]
+        site_nbs_sets = self.structure_environments.neighbors_sets[site_idx]
         ce_and_neighbors = []
         for fractions_dict in geoms_and_maps_list:
             ce_map = fractions_dict["ce_map"]
@@ -479,7 +487,7 @@ class AbstractChemenvStrategy(MSONable, abc.ABC):
         raise NotImplementedError
 
     @classmethod
-    def from_dict(cls, dct) -> Self:
+    def from_dict(cls, dct: dict) -> Self:
         """
         Reconstructs the SimpleAbundanceChemenvStrategy object from a dict representation of the
         SimpleAbundanceChemenvStrategy object created using the as_dict method.
@@ -1240,7 +1248,7 @@ class TargetedPenaltiedAbundanceChemenvStrategy(SimpleAbundanceChemenvStrategy):
         )
 
     @classmethod
-    def from_dict(cls, dct) -> Self:
+    def from_dict(cls, dct: dict) -> Self:
         """
         Reconstructs the TargetedPenaltiedAbundanceChemenvStrategy object from a dict representation of the
         TargetedPenaltiedAbundanceChemenvStrategy object created using the as_dict method.
@@ -1261,7 +1269,7 @@ class TargetedPenaltiedAbundanceChemenvStrategy(SimpleAbundanceChemenvStrategy):
 
 
 class NbSetWeight(MSONable, abc.ABC):
-    """Abstract object for neighbors sets weights estimations."""
+    """Abstract base class for neighbor set weight estimations."""
 
     @abc.abstractmethod
     def as_dict(self):
@@ -1278,7 +1286,7 @@ class NbSetWeight(MSONable, abc.ABC):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
 
 
@@ -1309,7 +1317,7 @@ class AngleNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         return self.aw(nb_set=nb_set)
 
@@ -1530,7 +1538,7 @@ class NormalizedAngleDistanceNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         fda_list = self.fda(nb_set=nb_set)
         return self.eval(fda_list=fda_list)
@@ -1636,11 +1644,11 @@ class SelfCSMNbSetWeight(NbSetWeight):
 
     SHORT_NAME = "SelfCSMWeight"
 
-    DEFAULT_EFFECTIVE_CSM_ESTIMATOR = dict(
+    DEFAULT_EFFECTIVE_CSM_ESTIMATOR: ClassVar = dict(
         function="power2_inverse_decreasing",
         options={"max_csm": 8.0},
     )
-    DEFAULT_WEIGHT_ESTIMATOR = dict(
+    DEFAULT_WEIGHT_ESTIMATOR: ClassVar = dict(
         function="power2_decreasing_exp",
         options={"max_csm": 8.0, "alpha": 1},
     )
@@ -1676,7 +1684,7 @@ class SelfCSMNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         effective_csm = get_effective_csm(
             nb_set=nb_set,
@@ -1739,12 +1747,12 @@ class DeltaCSMNbSetWeight(NbSetWeight):
 
     SHORT_NAME = "DeltaCSMWeight"
 
-    DEFAULT_EFFECTIVE_CSM_ESTIMATOR = dict(
+    DEFAULT_EFFECTIVE_CSM_ESTIMATOR: ClassVar = dict(
         function="power2_inverse_decreasing",
         options={"max_csm": 8.0},
     )
     DEFAULT_SYMMETRY_MEASURE_TYPE = "csm_wcs_ctwcc"
-    DEFAULT_WEIGHT_ESTIMATOR = dict(
+    DEFAULT_WEIGHT_ESTIMATOR: ClassVar = dict(
         function="smootherstep",
         options={"delta_csm_min": 0.5, "delta_csm_max": 3.0},
     )
@@ -1787,7 +1795,7 @@ class DeltaCSMNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         effcsm = get_effective_csm(
             nb_set=nb_set,
@@ -2002,7 +2010,7 @@ class CNBiasNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         return self.cn_weights[len(nb_set)]
 
@@ -2117,7 +2125,7 @@ class DistanceAngleAreaNbSetWeight(NbSetWeight):
     SHORT_NAME = "DistAngleAreaWeight"
 
     AC = AdditionalConditions()
-    DEFAULT_SURFACE_DEFINITION = dict(
+    DEFAULT_SURFACE_DEFINITION: ClassVar = dict(
         type="standard_elliptic",
         distance_bounds={"lower": 1.2, "upper": 1.8},
         angle_bounds={"lower": 0.1, "upper": 0.8},
@@ -2182,7 +2190,7 @@ class DistanceAngleAreaNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         return self.area_weight(
             nb_set=nb_set,
@@ -2278,14 +2286,10 @@ class DistanceAngleAreaNbSetWeight(NbSetWeight):
         # Case 2
         if d1 <= self.dmin and d2 <= self.dmax:
             ld2 = self.f_lower(d2)
-            if a2 <= ld2 or a1 >= self.amax:
-                return False
-            return True
+            return not (a2 <= ld2 or a1 >= self.amax)
         # Case 3
         if d1 <= self.dmin and d2 >= self.dmax:
-            if a2 <= self.amin or a1 >= self.amax:
-                return False
-            return True
+            return not (a2 <= self.amin or a1 >= self.amax)
         # Case 4
         if self.dmin <= d1 <= self.dmax and self.dmin <= d2 <= self.dmax:
             ld1 = self.f_lower(d1)
@@ -2294,15 +2298,11 @@ class DistanceAngleAreaNbSetWeight(NbSetWeight):
                 return False
             ud1 = self.f_upper(d1)
             ud2 = self.f_upper(d2)
-            if a1 >= ud1 and a1 >= ud2:
-                return False
-            return True
+            return not (a1 >= ud1 and a1 >= ud2)
         # Case 5
         if self.dmin <= d1 <= self.dmax and d2 >= self.dmax:
             ud1 = self.f_upper(d1)
-            if a1 >= ud1 or a2 <= self.amin:
-                return False
-            return True
+            return not (a1 >= ud1 or a2 <= self.amin)
         raise ValueError("Should not reach this point!")
 
     def __eq__(self, other: object) -> bool:
@@ -2383,7 +2383,7 @@ class DistancePlateauNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         return self.weight_rf.eval(nb_set.distance_plateau())
 
@@ -2450,7 +2450,7 @@ class AnglePlateauNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         return self.weight_rf.eval(nb_set.angle_plateau())
 
@@ -2513,7 +2513,7 @@ class DistanceNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         cn = cn_map[0]
         isite = nb_set.isite
@@ -2594,7 +2594,7 @@ class DeltaDistanceNbSetWeight(NbSetWeight):
             additional_info: Additional information.
 
         Returns:
-            Weight of the neighbors set.
+            float: Weight of the neighbors set.
         """
         cn = cn_map[0]
         isite = nb_set.isite
@@ -2648,7 +2648,7 @@ class WeightedNbSetChemenvStrategy(AbstractChemenvStrategy):
     """WeightedNbSetChemenvStrategy."""
 
     STRATEGY_DESCRIPTION = "    WeightedNbSetChemenvStrategy"
-    DEFAULT_CE_ESTIMATOR = dict(
+    DEFAULT_CE_ESTIMATOR: ClassVar = dict(
         function="power2_inverse_power2_decreasing",
         options={"max_csm": 8.0},
     )
@@ -2952,7 +2952,7 @@ class MultiWeightsChemenvStrategy(WeightedNbSetChemenvStrategy):
     #                         'cn_map_delta_csm', 'cn_map_delta_csms_cn_map2', 'cn_map_delta_csm_weight',
     #                         'cn_map_cn_weight',
     #                         'cn_map_fraction', 'cn_map_ce_fraction', 'ce_fraction']
-    DEFAULT_CE_ESTIMATOR = dict(
+    DEFAULT_CE_ESTIMATOR: ClassVar = dict(
         function="power2_inverse_power2_decreasing",
         options={"max_csm": 8.0},
     )

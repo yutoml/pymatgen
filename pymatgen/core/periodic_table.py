@@ -5,26 +5,31 @@ from __future__ import annotations
 import ast
 import functools
 import json
+import operator
 import re
 import warnings
 from collections import Counter
 from enum import Enum, unique
 from itertools import combinations, product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
+from monty.dev import deprecated
 from monty.json import MSONable
 
 from pymatgen.core.units import SUPPORTED_UNIT_NAMES, FloatWithUnit, Ha_to_eV, Length, Mass, Unit
+from pymatgen.io.core import ParseError
 from pymatgen.util.string import Stringify, formula_double_format
 
 if TYPE_CHECKING:
+    from typing import Any, Callable, Literal
+
     from typing_extensions import Self
 
     from pymatgen.util.typing import SpeciesLike
 
-# Loads element data from json file
+# Load element data from JSON file
 with open(Path(__file__).absolute().parent / "periodic_table.json", encoding="utf-8") as ptable_json:
     _pt_data = json.load(ptable_json)
 
@@ -51,18 +56,18 @@ class ElementBase(Enum):
         represented by a None unless otherwise stated.
 
         Args:
-            symbol (str): Element symbol, e.g., "H", "Fe"
+            symbol (str): Element symbol, e.g. "H", "Fe"
 
         Attributes:
             Z (int): Atomic number.
             symbol (str): Element symbol.
-            long_name (str): Long name for element. E.g., "Hydrogen".
+            long_name (str): Long name for element. e.g. "Hydrogen".
             A (int) : Atomic mass number (number of protons plus neutrons).
             atomic_radius_calculated (float): Calculated atomic radius for the element. This is the empirical value.
                 Data is obtained from http://wikipedia.org/wiki/Atomic_radii_of_the_elements_(data_page).
             van_der_waals_radius (float): Van der Waals radius for the element. This is the empirical value determined
                 from critical reviews of X-ray diffraction, gas kinetic collision cross-section, and other experimental
-                data by Bondi and later workers. The uncertainty in these values is on the order of 0.1 Å.
+                data by Bondi and later workers. The uncertainty in these values is on the order of 0.1 Å.
                 Data are obtained from "Atomic Radii of the Elements" in CRC Handbook of Chemistry and Physics,
                 91st Ed.; Haynes, W.M., Ed.; CRC Press: Boca Raton, FL, 2010.
             mendeleev_no (int): Mendeleev number from definition given by Pettifor, D. G. (1984). A chemical scale
@@ -73,9 +78,9 @@ class ElementBase(Enum):
             refractive_index (float): Refractive index.
             poissons_ratio (float): Poisson's ratio.
             molar_volume (float): Molar volume.
-            electronic_structure (str): Electronic structure. E.g., The electronic structure for Fe is represented
+            electronic_structure (str): Electronic structure. e.g. The electronic structure for Fe is represented
                 as [Ar].3d6.4s2.
-            atomic_orbitals (dict): Atomic Orbitals. Energy of the atomic orbitals as a dict. E.g., The orbitals
+            atomic_orbitals (dict): Atomic Orbitals. Energy of the atomic orbitals as a dict. e.g. The orbitals
                 energies in Hartree are represented as {'1s': -1.0, '2s': -0.1}. Data is obtained from
                 https://www.nist.gov/pml/data/atomic-reference-data-electronic-structure-calculations.
                 The LDA values for neutral atoms are used.
@@ -132,44 +137,6 @@ class ElementBase(Enum):
         self.long_name = data["Name"]
         self._data = data
 
-    @property
-    def X(self) -> float:
-        """Pauling electronegativity of element. Note that if an element does not
-        have an Pauling electronegativity, a NaN float is returned.
-        """
-        if X := self._data.get("X"):
-            return X
-        warnings.warn(
-            f"No Pauling electronegativity for {self.symbol}. Setting to NaN. This has no physical meaning, "
-            "and is mainly done to avoid errors caused by the code expecting a float."
-        )
-        return float("NaN")
-
-    @property
-    def atomic_radius(self) -> FloatWithUnit | None:
-        """
-        Returns:
-            float | None: The atomic radius of the element in Ångstroms. Can be None for
-            some elements like noble gases.
-        """
-        return self._atomic_radius
-
-    @property
-    def atomic_mass(self) -> FloatWithUnit:
-        """
-        Returns:
-            float: The atomic mass of the element in amu.
-        """
-        return self._atomic_mass
-
-    @property
-    def atomic_mass_number(self) -> FloatWithUnit | None:
-        """
-        Returns:
-            float: The atomic mass of the element in amu.
-        """
-        return self._atomic_mass_number
-
     def __getattr__(self, item: str) -> Any:
         """Key access to available element data.
 
@@ -179,7 +146,7 @@ class ElementBase(Enum):
         Raises:
             AttributeError: If item not in _pt_data.
         """
-        if item in [
+        if item in {
             "mendeleev_no",
             "electrical_resistivity",
             "velocity_of_sound",
@@ -209,9 +176,9 @@ class ElementBase(Enum):
             "ground_level",
             "ionization_energies",
             "metallic_radius",
-        ]:
-            kstr = item.capitalize().replace("_", " ")
-            val = self._data.get(kstr)
+        }:
+            key = item.capitalize().replace("_", " ")
+            val = self._data.get(key)
             if val is None or str(val).startswith("no data"):
                 warnings.warn(f"No data available for {item} for {self.symbol}")
                 val = None
@@ -258,10 +225,79 @@ class ElementBase(Enum):
             return val
         raise AttributeError(f"Element has no attribute {item}!")
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(self, Element) and isinstance(other, Element) and self.Z == other.Z and self.A == other.A
+
+    def __hash__(self) -> int:
+        # multiply Z by 1000 to avoid hash collisions of element N with isotopes of elements N+/-1,2,3...
+        return self.Z * 1000 + self.A if self._is_named_isotope else self.Z
+
+    def __repr__(self) -> str:
+        return f"Element {self.symbol}"
+
+    def __str__(self) -> str:
+        return self.symbol
+
+    def __lt__(self, other):
+        """Set a default sort order for atomic species by Pauling electronegativity. Very
+        useful for getting correct formulas. For example, FeO4PLi is
+        automatically sorted into LiFePO4.
+        """
+        if not hasattr(other, "X") or not hasattr(other, "symbol"):
+            return NotImplemented
+        x1 = float("inf") if self.X != self.X else self.X
+        x2 = float("inf") if other.X != other.X else other.X
+        if x1 != x2:
+            return x1 < x2
+
+        # There are cases where the Pauling electronegativity are exactly equal.
+        # We then sort by symbol.
+        return self.symbol < other.symbol
+
+    def __deepcopy__(self, memo) -> Element:
+        return Element(self.symbol)
+
+    @property
+    def X(self) -> float:
+        """Pauling electronegativity of element. Note that if an element does not
+        have an Pauling electronegativity, a NaN float is returned.
+        """
+        if X := self._data.get("X"):
+            return X
+        warnings.warn(
+            f"No Pauling electronegativity for {self.symbol}. Setting to NaN. This has no physical meaning, "
+            "and is mainly done to avoid errors caused by the code expecting a float."
+        )
+        return float("NaN")
+
+    @property
+    def atomic_radius(self) -> FloatWithUnit | None:
+        """
+        Returns:
+            float | None: The atomic radius of the element in Ångstroms. Can be None for
+            some elements like noble gases.
+        """
+        return self._atomic_radius
+
+    @property
+    def atomic_mass(self) -> FloatWithUnit:
+        """
+        Returns:
+            float: The atomic mass of the element in amu.
+        """
+        return self._atomic_mass
+
+    @property
+    def atomic_mass_number(self) -> FloatWithUnit | None:
+        """
+        Returns:
+            float: The atomic mass of the element in amu.
+        """
+        return self._atomic_mass_number
+
     @property
     def atomic_orbitals_eV(self) -> dict[str, float]:
-        """
-        Get the LDA energies in eV for neutral atoms, by orbital.
+        """The LDA energies in eV for neutral atoms, by orbital.
 
         This property contains the same info as `self.atomic_orbitals`,
         but uses eV for units, per matsci issue https://matsci.org/t/unit-of-atomic-orbitals-energy/54325
@@ -272,7 +308,7 @@ class ElementBase(Enum):
 
     @property
     def data(self) -> dict[str, Any]:
-        """Returns dict of data for element."""
+        """Dict of data for element."""
         return self._data.copy()
 
     @property
@@ -291,7 +327,7 @@ class ElementBase(Enum):
     @property
     def electronic_structure(self) -> str:
         """Electronic structure as string, with only valence electrons.
-        E.g., The electronic structure for Fe is represented as '[Ar].3d6.4s2'.
+        e.g. The electronic structure for Fe is represented as '[Ar].3d6.4s2'.
         """
         return re.sub("</*sup>", "", self._data["Electronic structure"])
 
@@ -320,7 +356,7 @@ class ElementBase(Enum):
         return FloatWithUnit(0.0, "ang")
 
     @property
-    def average_anionic_radius(self) -> float:
+    def average_anionic_radius(self) -> FloatWithUnit:
         """Average anionic radius for element (with units). The average is
         taken over all negative oxidation states of the element for which
         data is present.
@@ -332,7 +368,7 @@ class ElementBase(Enum):
         return FloatWithUnit(0.0, "ang")
 
     @property
-    def ionic_radii(self) -> dict[int, float]:
+    def ionic_radii(self) -> dict[int, FloatWithUnit]:
         """All ionic radii of the element as a dict of
         {oxidation state: ionic radii}. Radii are given in angstrom.
         """
@@ -362,7 +398,7 @@ class ElementBase(Enum):
     @property
     def oxidation_states(self) -> tuple[int, ...]:
         """Tuple of all known oxidation states."""
-        return tuple(int(x) for x in self._data.get("Oxidation states", []))
+        return tuple(map(int, self._data.get("Oxidation states", [])))
 
     @property
     def common_oxidation_states(self) -> tuple[int, ...]:
@@ -379,7 +415,7 @@ class ElementBase(Enum):
     @property
     def full_electronic_structure(self) -> list[tuple[int, str, int]]:
         """Full electronic structure as tuple.
-        E.g., The electronic structure for Fe is represented as:
+        e.g. The electronic structure for Fe is represented as:
         [(1, "s", 2), (2, "s", 2), (2, "p", 6), (3, "s", 2), (3, "p", 6),
         (3, "d", 6), (4, "s", 2)].
         """
@@ -387,7 +423,7 @@ class ElementBase(Enum):
 
         def parse_orbital(orb_str):
             if match := re.match(r"(\d+)([spdfg]+)(\d+)", orb_str):
-                return int(match.group(1)), match.group(2), int(match.group(3))
+                return int(match[1]), match[2], int(match[3])
             return orb_str
 
         data = [parse_orbital(s) for s in e_str.split(".")]
@@ -397,13 +433,15 @@ class ElementBase(Enum):
         return data
 
     @property
-    def valence(self):
-        """From full electron config obtain valence subshell angular moment (L) and number of valence e- (v_e)."""
+    def valence(self) -> tuple[int | np.nan, int]:
+        """Valence subshell angular moment (L) and number of valence e- (v_e),
+        obtained from full electron config.
+        """
         if self.group == 18:
             return np.nan, 0  # The number of valence of noble gas is 0
 
         L_symbols = "SPDFGHIKLMNOQRTUVWXYZ"
-        valence = []
+        valence: list[tuple[int, int]] = []
         full_electron_config = self.full_electronic_structure
         last_orbital = full_electron_config[-1]
         for n, l_symbol, ne in full_electron_config:
@@ -425,8 +463,6 @@ class ElementBase(Enum):
         if self.is_noble_gas:
             return [["1S0"]]
 
-        L_symbols = "SPDFGHIKLMNOQRTUVWXYZ"
-
         L, v_e = self.valence
 
         # for one electron in subshell L
@@ -447,6 +483,7 @@ class ElementBase(Enum):
         comb_counter = Counter(zip(TL, TS))
 
         term_symbols = []
+        L_symbols = "SPDFGHIKLMNOQRTUVWXYZ"
         while sum(comb_counter.values()) > 0:
             # Start from the lowest freq combination,
             # which corresponds to largest abs(L) and smallest abs(S)
@@ -465,64 +502,33 @@ class ElementBase(Enum):
         return term_symbols
 
     @property
-    def ground_state_term_symbol(self):
-        """Ground state term symbol
+    def ground_state_term_symbol(self) -> str:
+        """Ground state term symbol.
         Selected based on Hund's Rule.
         """
         L_symbols = "SPDFGHIKLMNOQRTUVWXYZ"
 
         term_symbols = self.term_symbols
-        term_symbol_flat = {
+        term_symbol_flat = {  # type: ignore[var-annotated]
             term: {
                 "multiplicity": int(term[0]),
                 "L": L_symbols.index(term[1]),
                 "J": float(term[2:]),
             }
-            for term in sum(term_symbols, [])  # noqa: RUF017
+            for term in functools.reduce(operator.iadd, term_symbols, [])
         }
 
-        multi = [int(item["multiplicity"]) for terms, item in term_symbol_flat.items()]
+        multi = [int(item["multiplicity"]) for _terms, item in term_symbol_flat.items()]
         max_multi_terms = {
             symbol: item for symbol, item in term_symbol_flat.items() if item["multiplicity"] == max(multi)
         }
 
-        Ls = [item["L"] for terms, item in max_multi_terms.items()]
+        Ls = [item["L"] for _terms, item in max_multi_terms.items()]
         max_L_terms = {symbol: item for symbol, item in term_symbol_flat.items() if item["L"] == max(Ls)}
 
         J_sorted_terms = sorted(max_L_terms.items(), key=lambda k: k[1]["J"])
         L, v_e = self.valence
-        if v_e <= (2 * L + 1):
-            return J_sorted_terms[0][0]
-        return J_sorted_terms[-1][0]
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(self, Element) and isinstance(other, Element) and self.Z == other.Z and self.A == other.A
-
-    def __hash__(self) -> int:
-        # multiply Z by 1000 to avoid hash collisions of element N with isotopes of elements N+/-1,2,3...
-        return self.Z * 1000 + self.A if self._is_named_isotope else self.Z
-
-    def __repr__(self) -> str:
-        return "Element " + self.symbol
-
-    def __str__(self) -> str:
-        return self.symbol
-
-    def __lt__(self, other):
-        """Sets a default sort order for atomic species by Pauling electronegativity. Very
-        useful for getting correct formulas. For example, FeO4PLi is
-        automatically sorted into LiFePO4.
-        """
-        if not hasattr(other, "X") or not hasattr(other, "symbol"):
-            return NotImplemented
-        x1 = float("inf") if self.X != self.X else self.X
-        x2 = float("inf") if other.X != other.X else other.X
-        if x1 != x2:
-            return x1 < x2
-
-        # There are cases where the Pauling electronegativity are exactly equal.
-        # We then sort by symbol.
-        return self.symbol < other.symbol
+        return J_sorted_terms[0][0] if v_e <= (2 * L + 1) else J_sorted_terms[-1][0]
 
     @staticmethod
     def from_Z(Z: int, A: int | None = None) -> Element:
@@ -539,6 +545,7 @@ class ElementBase(Enum):
             atomic_mass_num = data.get("Atomic mass no") if A else None
             if data["Atomic no"] == Z and atomic_mass_num == A:
                 return Element(sym)
+
         raise ValueError(f"Unexpected atomic number {Z=}")
 
     @staticmethod
@@ -551,17 +558,20 @@ class ElementBase(Enum):
         Returns:
             Element with the name 'name'
         """
-        # to accommodate the British-english-speaking world
+        # Accommodate the British-English world
         uk_to_us = {"aluminium": "aluminum", "caesium": "cesium"}
         name = uk_to_us.get(name.lower(), name)
+
         for sym, data in _pt_data.items():
             if data["Name"] == name.capitalize():
                 return Element(sym)
+
         raise ValueError(f"No element with the {name=}")
 
     @staticmethod
     def from_row_and_group(row: int, group: int) -> Element:
-        """Returns an element from a row and group number.
+        """Get an element from a row and group number.
+
         Important Note: For lanthanoids and actinoids, the row number must
         be 8 and 9, respectively, and the group number must be
         between 3 (La, Ac) and 17 (Lu, Lr). This is different than the
@@ -582,33 +592,34 @@ class ElementBase(Enum):
         for sym in _pt_data:
             el = Element(sym)
             if 57 <= el.Z <= 71:
-                el_pseudorow = 8
-                el_pseudogroup = (el.Z - 54) % 32
+                el_pseudo_row = 8
+                el_pseudo_group = (el.Z - 54) % 32
             elif 89 <= el.Z <= 103:
-                el_pseudorow = 9
-                el_pseudogroup = (el.Z - 54) % 32
+                el_pseudo_row = 9
+                el_pseudo_group = (el.Z - 54) % 32
             else:
-                el_pseudorow = el.row
-                el_pseudogroup = el.group
-            if el_pseudorow == row and el_pseudogroup == group:
+                el_pseudo_row = el.row
+                el_pseudo_group = el.group
+            if el_pseudo_row == row and el_pseudo_group == group:
                 return el
+
         raise ValueError("No element with this row and group!")
 
     @staticmethod
     def is_valid_symbol(symbol: str) -> bool:
-        """Returns true if symbol is a valid element symbol.
+        """Check if symbol (e.g., "H") is a valid element symbol.
 
         Args:
             symbol (str): Element symbol
 
         Returns:
-            bool: True if symbol is a valid element (e.g., "H").
+            bool: True if symbol is a valid element.
         """
         return symbol in Element.__members__
 
     @property
     def row(self) -> int:
-        """Returns the periodic table row of the element.
+        """The periodic table row of the element.
         Note: For lanthanoids and actinoids, the row is always 6 or 7,
         respectively.
         """
@@ -618,15 +629,15 @@ class ElementBase(Enum):
             return 6
         if 89 <= z <= 103:
             return 7
-        for i, size in enumerate(_pt_row_sizes, start=1):
+        for idx, size in enumerate(_pt_row_sizes, start=1):
             total += size
             if total >= z:
-                return i
+                return idx
         return 8
 
     @property
     def group(self) -> int:
-        """Returns the periodic table group of the element.
+        """The periodic table group of the element.
         Note: For lanthanoids and actinoids, the group is always 3.
         """
         z = self.Z
@@ -658,18 +669,17 @@ class ElementBase(Enum):
 
     @property
     def block(self) -> str:
-        """Return the block character "s,p,d,f"."""
+        """The block character "s, p, d, f"."""
         if (self.is_actinoid or self.is_lanthanoid) and self.Z not in [71, 103]:
             return "f"
-        if self.is_actinoid or self.is_lanthanoid:
+        if self.is_actinoid or self.is_lanthanoid or self.group in range(3, 13):
             return "d"
         if self.group in [1, 2]:
             return "s"
         if self.group in range(13, 19):
             return "p"
-        if self.group in range(3, 13):
-            return "d"
-        raise ValueError("unable to determine block")
+
+        raise ValueError("Unable to determine block.")
 
     @property
     def is_noble_gas(self) -> bool:
@@ -688,8 +698,19 @@ class ElementBase(Enum):
         return self.symbol in ("Al", "Ga", "In", "Tl", "Sn", "Pb", "Bi")
 
     @property
+    def is_rare_earth(self) -> bool:
+        """True if element is a rare earth element, including Lanthanides (La)
+        series, Actinides (Ac) series, Scandium (Sc) and Yttrium (Y).
+        """
+        return self.is_lanthanoid or self.is_actinoid or self.symbol in {"Sc", "Y"}
+
+    @property
+    @deprecated(is_rare_earth, message="is_rare_earth is corrected to include Y and Sc.", deadline=(2025, 1, 1))
     def is_rare_earth_metal(self) -> bool:
-        """True if element is a rare earth metal."""
+        """True if element is a rare earth metal, Lanthanides (La) series and Actinides (Ac) series.
+
+        This property is Deprecated, and scheduled for removal after 2025-01-01.
+        """
         return self.is_lanthanoid or self.is_actinoid
 
     @property
@@ -707,27 +728,27 @@ class ElementBase(Enum):
     @property
     def is_metalloid(self) -> bool:
         """True if element is a metalloid."""
-        return self.symbol in ("B", "Si", "Ge", "As", "Sb", "Te", "Po")
+        return self.symbol in {"B", "Si", "Ge", "As", "Sb", "Te", "Po"}
 
     @property
     def is_alkali(self) -> bool:
         """True if element is an alkali metal."""
-        return self.Z in (3, 11, 19, 37, 55, 87)
+        return self.Z in {3, 11, 19, 37, 55, 87}
 
     @property
     def is_alkaline(self) -> bool:
         """True if element is an alkaline earth metal (group II)."""
-        return self.Z in (4, 12, 20, 38, 56, 88)
+        return self.Z in {4, 12, 20, 38, 56, 88}
 
     @property
     def is_halogen(self) -> bool:
         """True if element is a halogen."""
-        return self.Z in (9, 17, 35, 53, 85)
+        return self.Z in {9, 17, 35, 53, 85}
 
     @property
     def is_chalcogen(self) -> bool:
         """True if element is a chalcogen."""
-        return self.Z in (8, 16, 34, 52, 84)
+        return self.Z in {8, 16, 34, 52, 84}
 
     @property
     def is_lanthanoid(self) -> bool:
@@ -740,28 +761,30 @@ class ElementBase(Enum):
         return 88 < self.Z < 104
 
     @property
+    def is_radioactive(self) -> bool:
+        """True if element is radioactive."""
+        return self.Z in {43, 61} or self.Z >= 84
+
+    @property
     def is_quadrupolar(self) -> bool:
-        """Checks if this element can be quadrupolar."""
+        """Check if this element can be quadrupolar."""
         return len(self.data.get("NMR Quadrupole Moment", {})) > 0
 
     @property
     def nmr_quadrupole_moment(self) -> dict[str, FloatWithUnit]:
-        """Get a dictionary the nuclear electric quadrupole moment in units of
+        """A dictionary the nuclear electric quadrupole moment in units of
         e*millibarns for various isotopes.
         """
         return {k: FloatWithUnit(v, "mbarn") for k, v in self.data.get("NMR Quadrupole Moment", {}).items()}
 
     @property
-    def iupac_ordering(self):
+    def iupac_ordering(self) -> int:
         """Ordering according to Table VI of "Nomenclature of Inorganic Chemistry
         (IUPAC Recommendations 2005)". This ordering effectively follows the
         groups and rows of the periodic table, except the Lanthanides, Actinides
         and hydrogen.
         """
         return self._data["IUPAC ordering"]
-
-    def __deepcopy__(self, memo):
-        return Element(self.symbol)
 
     def as_dict(self) -> dict[Literal["element", "@module", "@class"], str]:
         """Serialize to MSONable dict representation e.g. to write to disk as JSON."""
@@ -960,8 +983,11 @@ class Species(MSONable, Stringify):
             )
         if isinstance(symbol, str) and symbol.endswith(("+", "-")):
             # Extract oxidation state from symbol
-            symbol, oxi = re.match(r"([A-Za-z]+)([0-9]*[\+\-])", symbol).groups()  # type: ignore[union-attr]
-            self._oxi_state: float | None = (1 if "+" in oxi else -1) * float(oxi[:-1] or 1)
+            try:
+                symbol, oxi = re.match(r"([A-Za-z]+)([0-9\.0-9]*[\+\-])", symbol).groups()  # type: ignore[union-attr]
+                self._oxi_state: float | None = (1 if "+" in oxi else -1) * float(oxi[:-1] or 1)
+            except AttributeError:
+                raise ParseError(f"Failed to parse {symbol=}")
         else:
             self._oxi_state = oxidation_state
 
@@ -970,7 +996,7 @@ class Species(MSONable, Stringify):
         self._spin = spin
 
     def __getattr__(self, attr: str) -> Any:
-        """Allows Specie to inherit properties of underlying element."""
+        """Allow Specie to inherit properties of underlying element."""
         return getattr(self._el, attr)
 
     def __getstate__(self) -> dict:
@@ -995,7 +1021,7 @@ class Species(MSONable, Stringify):
         return hash(str(self))
 
     def __lt__(self, other: object) -> bool:
-        """Sets a default sort order for atomic species by Pauling electronegativity,
+        """Set a default sort order for atomic species by Pauling electronegativity,
         followed by oxidation state, followed by spin.
         """
         if not isinstance(other, type(self)):
@@ -1013,11 +1039,28 @@ class Species(MSONable, Stringify):
             other_oxi = 0 if (isinstance(other, Element) or other.oxi_state is None) else other.oxi_state
             return self.oxi_state < other_oxi
         if self.spin is not None:
-            if other.spin is not None:
-                return self.spin < other.spin
-            return False
+            return self.spin < other.spin if other.spin is not None else False
 
         return False
+
+    def __repr__(self) -> str:
+        return f"Species {self}"
+
+    def __str__(self) -> str:
+        output = self.name if hasattr(self, "name") else self.symbol
+        if self.oxi_state is not None:
+            abs_charge = formula_double_format(abs(self.oxi_state))
+            if isinstance(abs_charge, float):
+                abs_charge = f"{abs_charge:.2f}"
+            output += f"{abs_charge}{'+' if self.oxi_state >= 0 else '-'}"
+
+        if self._spin is not None:
+            spin = self._spin
+            output += f",{spin=}"
+        return output
+
+    def __deepcopy__(self, memo) -> Self:
+        return type(self)(self.symbol, self.oxi_state, spin=self._spin)
 
     @property
     def element(self) -> Element:
@@ -1033,6 +1076,23 @@ class Species(MSONable, Stringify):
     def spin(self) -> float | None:
         """Spin of Species."""
         return self._spin
+
+    @property
+    def full_electronic_structure(self) -> list[tuple[int, str, int]]:
+        """Full electronic structure as tuple. Not implemented for Species as of now."""
+        raise NotImplementedError
+
+    @property
+    def electronic_structure(self) -> list[tuple[int, str, int]]:
+        """Electronic structure as tuple. Not implemented for Species as of now."""
+        raise NotImplementedError
+
+    @property
+    def valence(self) -> tuple[int | np.nan, int]:
+        """Valence subshell angular moment (L) and number of valence e- (v_e),
+        obtained from full electron config. Not implemented for Species as of now.
+        """
+        raise NotImplementedError
 
     @property
     def ionic_radius(self) -> float | None:
@@ -1054,11 +1114,11 @@ class Species(MSONable, Stringify):
 
     @classmethod
     def from_str(cls, species_string: str) -> Self:
-        """Returns a Species from a string representation.
+        """Get a Species from a string representation.
 
         Args:
             species_string (str): A typical string representation of a
-                species, e.g., "Mn2+", "Fe3+", "O2-".
+                species, e.g. "Mn2+", "Fe3+", "O2-".
 
         Returns:
             A Species object.
@@ -1072,46 +1132,28 @@ class Species(MSONable, Stringify):
         # 3rd group: ([+\-])          --> +
         # 4th group: (.*)             --> everything else, ",spin=5"
 
-        match = re.search(r"([A-Z][a-z]*)([0-9.]*)([+\-]*)(.*)", species_string)
-        if match:
-            # parse symbol
-            sym = match.group(1)
+        if match := re.search(r"([A-Z][a-z]*)([0-9.]*)([+\-]*)(.*)", species_string):
+            sym = match[1]  # parse symbol
 
-            # parse oxidation state (optional)
-            if not match.group(2) and not match.group(3):
+            # Parse oxidation state (optional)
+            if not match[2] and not match[3]:
                 oxi = None
             else:
-                oxi = 1 if match.group(2) == "" else float(match.group(2))
-                oxi = -oxi if match.group(3) == "-" else oxi
+                oxi = 1 if match[2] == "" else float(match[2])
+                oxi = -oxi if match[3] == "-" else oxi
 
-            # parse properties (optional)
+            # Parse properties (optional)
             properties = {}
-            if match.group(4):  # has Spin properties
-                tokens = match.group(4).replace(",", "").split("=")
+            if match[4]:  # has Spin properties
+                tokens = match[4].replace(",", "").split("=")
                 properties = {tokens[0]: ast.literal_eval(tokens[1])}
 
-            # but we need either an oxidation state or a property
-            if oxi is None and properties == {}:
+            # But we need either an oxidation state or a property
+            if oxi is None and not properties:
                 raise ValueError("Invalid species string")
 
             return cls(sym, 0 if oxi is None else oxi, **properties)
         raise ValueError("Invalid species string")
-
-    def __repr__(self) -> str:
-        return f"Species {self}"
-
-    def __str__(self) -> str:
-        output = self.name if hasattr(self, "name") else self.symbol
-        if self.oxi_state is not None:
-            abs_charge = formula_double_format(abs(self.oxi_state))
-            if isinstance(abs_charge, float):
-                abs_charge = f"{abs_charge:.2f}"
-            output += f"{abs_charge}{'+' if self.oxi_state >= 0 else '-'}"
-
-        if self._spin is not None:
-            spin = self._spin
-            output += f",{spin=}"
-        return output
 
     def to_pretty_string(self) -> str:
         """String without properties."""
@@ -1124,7 +1166,7 @@ class Species(MSONable, Stringify):
         return output
 
     def get_nmr_quadrupole_moment(self, isotope: str | None = None) -> float:
-        """Gets the nuclear electric quadrupole moment in units of e * millibarns.
+        """Get the nuclear electric quadrupole moment in units of e * millibarns.
 
         Args:
             isotope (str): the isotope to get the quadrupole moment for
@@ -1191,7 +1233,7 @@ class Species(MSONable, Stringify):
             spin_config ("low" | "high"): Whether the species is in a high or low spin state
 
         Returns:
-            Crystal field spin in Bohr magneton.
+            float: Crystal field spin in Bohr magneton.
 
         Raises:
             AttributeError if species is not a valid transition metal or has
@@ -1201,18 +1243,16 @@ class Species(MSONable, Stringify):
         if coordination not in ("oct", "tet") or spin_config not in ("high", "low"):
             raise ValueError("Invalid coordination or spin config")
 
-        elec = self.full_electronic_structure
+        elec = self.element.full_electronic_structure
         if len(elec) < 4 or elec[-1][1] != "s" or elec[-2][1] != "d":
             raise AttributeError(f"Invalid element {self.symbol} for crystal field calculation")
 
-        n_electrons = elec[-1][2] + elec[-2][2] - self.oxi_state
+        n_electrons = elec[-1][2] + elec[-2][2] - self.oxi_state  # type: ignore
         if n_electrons < 0 or n_electrons > 10:
             raise AttributeError(f"Invalid oxidation state {self.oxi_state} for element {self.symbol}")
 
         if spin_config == "high":
-            if n_electrons <= 5:
-                return n_electrons
-            return 10 - n_electrons
+            return n_electrons if n_electrons <= 5 else 10 - n_electrons
 
         if spin_config == "low":
             if coordination == "oct":
@@ -1234,9 +1274,6 @@ class Species(MSONable, Stringify):
                 return 10 - n_electrons
             return None
         return None
-
-    def __deepcopy__(self, memo) -> Species:
-        return Species(self.symbol, self.oxi_state, spin=self._spin)
 
     def as_dict(self) -> dict:
         """JSON-able dictionary representation."""
@@ -1290,7 +1327,7 @@ class DummySpecies(Species):
                 rules are applied to the choice of the symbol. The dummy
                 symbol cannot have any part of first two letters that will
                 constitute an Element symbol. Otherwise, a composition may
-                be parsed wrongly. E.g., "X" is fine, but "Vac" is not
+                be parsed wrongly. e.g. "X" is fine, but "Vac" is not
                 because Vac contains V, a valid Element.
             oxidation_state (float): Oxidation state for dummy specie. Defaults to 0.
                 deprecated and retained purely for backward compatibility.
@@ -1310,11 +1347,11 @@ class DummySpecies(Species):
         self._oxi_state = oxidation_state
         self._spin = spin
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> None:
         raise AttributeError
 
-    def __lt__(self, other):
-        """Sets a default sort order for atomic species by Pauling electronegativity,
+    def __lt__(self, other) -> bool:
+        """Set a default sort order for atomic species by Pauling electronegativity,
         followed by oxidation state.
         """
         if self.X != other.X:
@@ -1325,6 +1362,21 @@ class DummySpecies(Species):
             return self.symbol < other.symbol
         other_oxi = 0 if isinstance(other, Element) else other.oxi_state
         return self.oxi_state < other_oxi
+
+    def __repr__(self) -> str:
+        return f"DummySpecies {self}"
+
+    def __str__(self) -> str:
+        output = self.symbol
+        if self.oxi_state is not None:
+            output += f"{formula_double_format(abs(self.oxi_state))}{'+' if self.oxi_state >= 0 else '-'}"
+        if self._spin is not None:
+            spin = self._spin
+            output += f",{spin=}"
+        return output
+
+    def __deepcopy__(self, memo) -> Self:
+        return type(self)(self.symbol, self._oxi_state)
 
     @property
     def Z(self) -> int:
@@ -1365,16 +1417,13 @@ class DummySpecies(Species):
         """Symbol for DummySpecies."""
         return self._symbol
 
-    def __deepcopy__(self, memo):
-        return DummySpecies(self.symbol, self._oxi_state)
-
     @classmethod
     def from_str(cls, species_string: str) -> Self:
-        """Returns a Dummy from a string representation.
+        """Get a Dummy from a string representation.
 
         Args:
             species_string (str): A string representation of a dummy
-                species, e.g., "X2+", "X3+".
+                species, e.g. "X2+", "X3+".
 
         Returns:
             A DummySpecies object.
@@ -1383,20 +1432,20 @@ class DummySpecies(Species):
             ValueError if species_string cannot be interpreted.
         """
         if match := re.search(r"([A-ZAa-z]*)([0-9.]*)([+\-]*)(.*)", species_string):
-            sym = match.group(1)
-            if match.group(2) == match.group(3) == "":
+            sym = match[1]
+            if match[2] == match[3] == "":
                 oxi = 0.0
             else:
-                oxi = 1.0 if match.group(2) == "" else float(match.group(2))
-                oxi = -oxi if match.group(3) == "-" else oxi
+                oxi = 1.0 if match[2] == "" else float(match[2])
+                oxi = -oxi if match[3] == "-" else oxi
             properties = {}
-            if match.group(4):  # has Spin property
-                tokens = match.group(4).split("=")
+            if match[4]:  # has Spin property
+                tokens = match[4].split("=")
                 properties = {tokens[0]: float(tokens[1])}
             return cls(sym, oxi, **properties)
         raise ValueError("Invalid DummySpecies String")
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         """MSONable dict representation."""
         return {
             "@module": type(self).__module__,
@@ -1416,18 +1465,6 @@ class DummySpecies(Species):
             DummySpecies
         """
         return cls(dct["element"], dct["oxidation_state"], spin=dct.get("spin"))
-
-    def __repr__(self) -> str:
-        return f"DummySpecies {self}"
-
-    def __str__(self) -> str:
-        output = self.symbol
-        if self.oxi_state is not None:
-            output += f"{formula_double_format(abs(self.oxi_state))}{'+' if self.oxi_state >= 0 else '-'}"
-        if self._spin is not None:
-            spin = self._spin
-            output += f",{spin=}"
-        return output
 
 
 @functools.total_ordering
@@ -1515,6 +1552,7 @@ class ElementType(Enum):
     chalcogen = "chalcogen"  # O, S, Se, Te, Po
     lanthanoid = "lanthanoid"  # La-Lu
     actinoid = "actinoid"  # Ac-Lr
+    radioactive = "radioactive"  # Tc, Pm, Po-Lr
     quadrupolar = "quadrupolar"
     s_block = "s-block"
     p_block = "p-block"

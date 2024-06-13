@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections import namedtuple
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -16,10 +15,9 @@ from pymatgen.util.due import Doi, due
 from pymatgen.util.provenance import StructureNL
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import ClassVar
 
-# TODO: importing optimade-python-tool's data structures will make more sense
-Provider = namedtuple("Provider", ["name", "base_url", "description", "homepage", "prefix"])
+    from typing_extensions import Self
 
 _logger = logging.getLogger(__name__)
 _handler = logging.StreamHandler(sys.stdout)
@@ -27,12 +25,22 @@ _logger.addHandler(_handler)
 _logger.setLevel(logging.WARNING)
 
 
+class Provider(NamedTuple):
+    """TODO: Import optimade-python-tool's data structures will make more sense."""
+
+    name: str
+    base_url: str
+    description: str
+    homepage: str
+    prefix: str
+
+
 @due.dcite(
     Doi("10.1038/s41597-021-00974-z"),
     description="OPTIMADE, an API for exchanging materials data",
 )
 class OptimadeRester:
-    """Class to call OPTIMADE-compliant APIs, see https://optimade.org and [1].
+    """Call OPTIMADE-compliant APIs, see https://optimade.org and [1].
 
     This class is ready to use but considered in-development and subject to change.
 
@@ -50,7 +58,7 @@ class OptimadeRester:
 
     # regenerate on-demand from official providers.json using OptimadeRester.refresh_aliases()
     # these aliases are provided as a convenient shortcut for users of the OptimadeRester class
-    aliases = {
+    aliases: ClassVar[dict[str, str]] = {
         "aflow": "http://aflow.org/API/optimade/",
         "alexandria": "https://alexandria.icams.rub.de/pbe",
         "alexandria.pbe": "https://alexandria.icams.rub.de/pbe",
@@ -167,12 +175,12 @@ class OptimadeRester:
         return self.describe()
 
     def describe(self):
-        """Provides human-readable information about the resources being searched by the OptimadeRester."""
+        """Human-readable information about the resources being searched by the OptimadeRester."""
         provider_text = "\n".join(map(str, (provider for provider in self._providers.values() if provider)))
         return f"OptimadeRester connected to:\n{provider_text}"
 
     def _get_json(self, url):
-        """Retrieves and returns JSON resource from given url."""
+        """Retrieve and returns JSON resource from given url."""
         return self.session.get(url, timeout=self._timeout).json()
 
     @staticmethod
@@ -230,7 +238,7 @@ class OptimadeRester:
             nelements: Number of elements, e.g. 4 or [2, 5] for the range >=2 and <=5
             nsites: Number of sites, e.g. 4 or [2, 5] for the range >=2 and <=5
             chemical_formula_anonymous: The desired chemical formula in OPTIMADE anonymous formula format
-            (NB. The ordering is reversed from the pymatgen format, e.g., pymatgen "ABC2" should become "A2BC").
+            (NB. The ordering is reversed from the pymatgen format, e.g. pymatgen "ABC2" should become "A2BC").
             chemical_formula_hill: The desired chemical formula in the OPTIMADE take on the Hill formula format.
             (NB. Again, this is different from the pymatgen format, as the OPTIMADE version is a reduced chemical
             formula simply using the IUPAC/Hill ordering.)
@@ -271,7 +279,7 @@ class OptimadeRester:
             nelements: Number of elements, e.g. 4 or [2, 5] for the range >=2 and <=5
             nsites: Number of sites, e.g. 4 or [2, 5] for the range >=2 and <=5
             chemical_formula_anonymous: The desired chemical formula in OPTIMADE anonymous formula format
-            (NB. The ordering is reversed from the pymatgen format, e.g., pymatgen "ABC2" should become "A2BC").
+            (NB. The ordering is reversed from the pymatgen format, e.g. pymatgen "ABC2" should become "A2BC").
             chemical_formula_hill: The desired chemical formula in the OPTIMADE take on the Hill formula format.
             (NB. Again, this is different from the pymatgen format, as the OPTIMADE version is a reduced chemical
             formula simply using the IUPAC/Hill ordering.)
@@ -440,7 +448,7 @@ class OptimadeRester:
         return snls
 
     def _validate_provider(self, provider_url) -> Provider | None:
-        """Checks that a given URL is indeed an OPTIMADE provider,
+        """Check that a given URL is indeed an OPTIMADE provider,
         returning None if it is not a provider, or the provider
         prefix if it is.
 
@@ -555,7 +563,7 @@ class OptimadeRester:
         return ",".join({*additional_response_fields, *self.mandatory_response_fields})
 
     def refresh_aliases(self, providers_url="https://providers.optimade.org/providers.json"):
-        """Updates available OPTIMADE structure resources based on the current list of OPTIMADE
+        """Update available OPTIMADE structure resources based on the current list of OPTIMADE
         providers.
         """
         json = self._get_json(providers_url)

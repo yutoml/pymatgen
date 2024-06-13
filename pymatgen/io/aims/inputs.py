@@ -11,7 +11,7 @@ import time
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from monty.io import zopen
@@ -21,8 +21,11 @@ from pymatgen.core import Lattice, Molecule, Structure
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Any
 
     from typing_extensions import Self
+
+    from pymatgen.util.typing import Tuple3Floats, Tuple3Ints
 
 __author__ = "Thomas A. R. Purcell"
 __version__ = "1.0"
@@ -230,7 +233,7 @@ ALLOWED_AIMS_CUBE_FORMATS = (
 
 @dataclass
 class AimsCube(MSONable):
-    """Class representing the FHI-aims cubes
+    """The FHI-aims cubes
 
     Attributes:
         type (str): The value to be outputted as a cube file
@@ -251,9 +254,9 @@ class AimsCube(MSONable):
     """
 
     type: str = field(default_factory=str)
-    origin: Sequence[float] | tuple[float, float, float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    origin: Sequence[float] | Tuple3Floats = field(default_factory=lambda: [0.0, 0.0, 0.0])
     edges: Sequence[Sequence[float]] = field(default_factory=lambda: 0.1 * np.eye(3))
-    points: Sequence[int] | tuple[int, int, int] = field(default_factory=lambda: [0, 0, 0])
+    points: Sequence[int] | Tuple3Ints = field(default_factory=lambda: [0, 0, 0])
     format: str = "cube"
     spin_state: int | None = None
     kpoint: int | None = None
@@ -289,10 +292,7 @@ class AimsCube(MSONable):
         if self.filename != other.filename:
             return False
 
-        if self.elf_type != other.elf_type:
-            return False
-
-        return True
+        return self.elf_type == other.elf_type
 
     def __post_init__(self) -> None:
         """Check the inputted variables to make sure they are correct
@@ -336,7 +336,7 @@ class AimsCube(MSONable):
 
     @property
     def control_block(self) -> str:
-        """Get the block of text for the control.in file of the Cube"""
+        """The block of text for the control.in file of the Cube"""
         cb = f"output cube {self.type}\n"
         cb += f"    cube origin {self.origin[0]: .12e} {self.origin[1]: .12e} {self.origin[2]: .12e}\n"
         for idx in range(3):
@@ -390,7 +390,7 @@ class AimsCube(MSONable):
 
 @dataclass
 class AimsControlIn(MSONable):
-    """Class representing and FHI-aims control.in file
+    """An FHI-aims control.in file.
 
     Attributes:
         _parameters (dict[str, Any]): The parameters dictionary containing all input
@@ -506,7 +506,7 @@ class AimsControlIn(MSONable):
             content += "# \n# List of parameters used to initialize the calculator:"
             for param, val in parameters.items():
                 content += f"#     {param}:{val}\n"
-        content += lim + "\n"
+        content += f"{lim}\n"
 
         assert ("smearing" in parameters and "occupation_type" in parameters) is False
 
@@ -543,7 +543,7 @@ class AimsControlIn(MSONable):
             for cube in cubes:
                 content += cube.control_block
 
-        content += lim + "\n\n"
+        content += f"{lim}\n\n"
         species_dir = self._parameters.get("species_dir", os.environ.get("AIMS_SPECIES_DIR"))
         content += self.get_species_block(structure, species_dir)
 
@@ -556,7 +556,7 @@ class AimsControlIn(MSONable):
         verbose_header: bool = False,
         overwrite: bool = False,
     ) -> None:
-        """Writes the control.in file
+        """Write the control.in file
 
         Args:
             structure (Structure | Molecule): The structure to write the input

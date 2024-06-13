@@ -167,7 +167,7 @@ def get_structure_components(
 
 
 def calculate_dimensionality_of_site(bonded_structure, site_index, inc_vertices=False):
-    """Calculates the dimensionality of the component containing the given site.
+    """Calculate the dimensionality of the component containing the given site.
 
     Implements directly the modified breadth-first-search algorithm described in
     Algorithm 1 of:
@@ -347,7 +347,7 @@ def get_dimensionality_cheon(
         else:
             dim = np.log2(float(max3) / max1) / np.log2(3)
             if dim == int(dim):
-                dim = str(int(dim)) + "D"
+                dim = f"{int(dim)}D"
             else:
                 return None
     else:
@@ -361,7 +361,7 @@ def get_dimensionality_cheon(
         else:
             dim = np.log2(float(max2) / max1)
             if dim == int(dim):
-                dim = str(int(dim)) + "D"
+                dim = f"{int(dim)}D"
             else:
                 structure = copy.copy(structure_save)
                 structure.make_supercell(np.eye(3) * 3)
@@ -372,15 +372,14 @@ def get_dimensionality_cheon(
                 else:
                     dim = np.log2(float(max3) / max1) / np.log2(3)
                     if dim == int(dim):
-                        dim = str(int(dim)) + "D"
+                        dim = f"{int(dim)}D"
                     else:
                         return None
     return dim
 
 
 def find_connected_atoms(struct, tolerance=0.45, ldict=None):
-    """
-    Finds bonded atoms and returns a adjacency matrix of bonded atoms.
+    """Find bonded atoms and returns a adjacency matrix of bonded atoms.
 
     Author: "Gowoon Cheon"
     Email: "gcheon@stanford.edu"
@@ -404,9 +403,9 @@ def find_connected_atoms(struct, tolerance=0.45, ldict=None):
 
     n_atoms = len(struct.species)
     fc = np.array(struct.frac_coords)
-    fc_copy = np.repeat(fc[:, :, np.newaxis], 27, axis=2)
+    fc_copy = np.repeat(fc[:, :, None], 27, axis=2)
     neighbors = np.array(list(itertools.product([0, 1, -1], [0, 1, -1], [0, 1, -1]))).T
-    neighbors = np.repeat(neighbors[np.newaxis, :, :], 1, axis=0)
+    neighbors = np.repeat(neighbors[None, :, :], 1, axis=0)
     fc_diff = fc_copy - neighbors
     species = list(map(str, struct.species))
     # in case of charged species
@@ -427,8 +426,7 @@ def find_connected_atoms(struct, tolerance=0.45, ldict=None):
 
 
 def find_clusters(struct, connected_matrix):
-    """
-    Finds bonded clusters of atoms in the structure with periodic boundary
+    """Find bonded clusters of atoms in the structure with periodic boundary
     conditions.
 
     If there are atoms that are not bonded to anything, returns [0,1,0]. (For

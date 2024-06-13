@@ -158,8 +158,7 @@ def post_discourse(version: str) -> None:
 
 @task
 def update_changelog(ctx: Context, version: str | None = None, dry_run: bool = False) -> None:
-    """
-    Create a preliminary change log using the git logs.
+    """Create a preliminary change log using the git logs.
 
     Args:
         ctx (invoke.Context): The context object.
@@ -177,12 +176,14 @@ def update_changelog(ctx: Context, version: str | None = None, dry_run: bool = F
         if re_match and "materialsproject/dependabot/pip" not in line:
             pr_number = re_match.group(1)
             contributor, pr_name = re_match.group(2).split("/", 1)
-            response = requests.get(f"https://api.github.com/repos/materialsproject/pymatgen/pulls/{pr_number}")
+            response = requests.get(
+                f"https://api.github.com/repos/materialsproject/pymatgen/pulls/{pr_number}", timeout=600
+            )
             lines += [f"* PR #{pr_number} from @{contributor} {pr_name}"]
             json_resp = response.json()
             if body := json_resp["body"]:
                 for ll in map(str.strip, body.split("\n")):
-                    if ll in ["", "## Summary"]:
+                    if ll in ("", "## Summary"):
                         continue
                     if ll.startswith(("## Checklist", "## TODO")):
                         break
@@ -196,7 +197,7 @@ def update_changelog(ctx: Context, version: str | None = None, dry_run: bool = F
     if dry_run:
         print(tokens[0] + "##".join(tokens[1:]))
     else:
-        with open("docs/docs/CHANGES.md", mode="w") as file:
+        with open("docs/CHANGES.md", mode="w") as file:
             file.write(tokens[0] + "##".join(tokens[1:]))
         ctx.run("open docs/CHANGES.md")
     print("The following commit messages were not included...")
@@ -247,5 +248,5 @@ def lint(ctx: Context) -> None:
     Args:
         ctx (invoke.Context): The context object.
     """
-    for cmd in ["ruff", "mypy", "ruff format"]:
+    for cmd in ("ruff", "mypy", "ruff format"):
         ctx.run(f"{cmd} pymatgen")

@@ -79,7 +79,7 @@ due.cite(
 
 
 class Critic2Caller:
-    """Class to call critic2 and store standard output for further processing."""
+    """Call critic2 and store standard output for further processing."""
 
     @requires(
         which("critic2"),
@@ -104,6 +104,7 @@ class Critic2Caller:
             _stdout, _stderr = rs.communicate()
         stdout = _stdout.decode()
 
+        stderr = ""
         if _stderr:
             stderr = _stderr.decode()
             warnings.warn(stderr)
@@ -179,7 +180,7 @@ class Critic2Caller:
                 critical points to a file 'table.cml' in the working directory
                 useful for visualization
             write_json (bool): Whether to write out critical points
-                and YT json. YT integration will be performed with this setting.
+                and YT JSON. YT integration will be performed with this setting.
             zpsp (dict): Dict of element/symbol name to number of electrons
                 (ZVAL in VASP pseudopotential), with which to properly augment core regions
                 and calculate charge transfer. Optional.
@@ -330,7 +331,7 @@ def get_filepath(filename, warning, path, suffix):
         path: Path to search
         suffix: Suffixes to search.
     """
-    paths = glob(os.path.join(path, filename + suffix + "*"))
+    paths = glob(os.path.join(path, f"{filename}{suffix}*"))
     if not paths:
         warnings.warn(warning)
         return None
@@ -359,7 +360,7 @@ class CriticalPoint(MSONable):
         coords=None,
         field_hessian=None,
     ):
-        """Class to characterize a critical point from a topological
+        """Characterize a critical point from a topological
         analysis of electron charge density.
 
         Note this class is usually associated with a Structure, so
@@ -387,8 +388,8 @@ class CriticalPoint(MSONable):
         self.field_hessian = field_hessian
 
     @property
-    def type(self):
-        """Returns: Instance of CriticalPointType."""
+    def type(self) -> CriticalPointType:
+        """Instance of CriticalPointType."""
         return CriticalPointType(self._type)
 
     def __str__(self):
@@ -396,7 +397,7 @@ class CriticalPoint(MSONable):
 
     @property
     def laplacian(self) -> float:
-        """Returns: The Laplacian of the field at the critical point."""
+        """The Laplacian of the field at the critical point."""
         return np.trace(self.field_hessian)
 
     @property
@@ -413,7 +414,7 @@ class CriticalPoint(MSONable):
 
 
 class Critic2Analysis(MSONable):
-    """Class to process the standard output from critic2 into pymatgen-compatible objects."""
+    """Process the standard output from critic2 into pymatgen-compatible objects."""
 
     def __init__(
         self,
@@ -452,8 +453,8 @@ class Critic2Analysis(MSONable):
             structure: associated Structure
             stdout: stdout from running critic2 in automatic mode
             stderr: stderr from running critic2 in automatic mode
-            cpreport: json output from CPREPORT command
-            yt: json output from YT command
+            cpreport: JSON output from CPREPORT command
+            yt: JSON output from YT command
             zpsp (dict): Dict of element/symbol name to number of electrons
                 (ZVAL in VASP pseudopotential), with which to calculate charge transfer.
                 Optional.
@@ -791,6 +792,7 @@ class Critic2Analysis(MSONable):
         unique_critical_points = []
 
         # parse unique critical points
+        start_i = end_i = unique_idx = None
         for idx, line in enumerate(stdout):
             if "mult  name            f             |grad|           lap" in line:
                 start_i = idx + 1

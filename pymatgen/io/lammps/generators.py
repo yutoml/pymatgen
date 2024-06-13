@@ -36,11 +36,11 @@ class BaseLammpsGenerator(InputGenerator):
     r"""
     Base class to generate LAMMPS input sets.
     Uses template files for the input. The variables that can be changed
-    in the input template file are those starting with a $ sign, e.g., $nsteps.
+    in the input template file are those starting with a $ sign, e.g. $nsteps.
     This generic class is specialized for each template in subclasses, e.g. LammpsMinimization.
     You can create a template for your own task following those present in pymatgen/io/lammps/templates.
     The parameters are then replaced based on the values found
-    in the settings dictionary that you provide, e.g., `{"nsteps": 1000}`.
+    in the settings dictionary that you provide, e.g. `{"nsteps": 1000}`.
 
     Attributes:
         template: Path (string) to the template file used to create the InputFile for LAMMPS.
@@ -142,30 +142,30 @@ class LammpsMinimization(BaseLammpsGenerator):
 
     @property
     def units(self) -> str:
-        """Return the argument of the command 'units' passed to the generator."""
+        """The argument of the command 'units' passed to the generator."""
         return self.settings["units"]
 
     @property
     def atom_style(self) -> str:
-        """Return the argument of the command 'atom_style' passed to the generator."""
+        """The argument of the command 'atom_style' passed to the generator."""
         return self.settings["atom_style"]
 
     @property
     def dimension(self) -> int:
-        """Return the argument of the command 'dimension' passed to the generator."""
+        """The argument of the command 'dimension' passed to the generator."""
         return self.settings["dimension"]
 
     @property
     def boundary(self) -> str:
-        """Return the argument of the command 'boundary' passed to the generator."""
+        """The argument of the command 'boundary' passed to the generator."""
         return self.settings["boundary"]
 
     @property
     def read_data(self) -> str:
-        """Return the argument of the command 'read_data' passed to the generator."""
+        """The argument of the command 'read_data' passed to the generator."""
         return self.settings["read_data"]
 
     @property
     def force_field(self) -> str:
-        """Return the details of the force field commands passed to the generator."""
+        """The details of the force field commands passed to the generator."""
         return self.settings["force_field"]

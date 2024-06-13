@@ -1,21 +1,24 @@
-"""
-Developer script to convert yaml periodic table to json format.
-Created on Nov 15, 2011.
-"""
+"""Developer script to convert YAML periodic table to JSON format.
+Created on 2011-11-15."""
 
 from __future__ import annotations
 
-import collections
 import json
 import re
+from collections import defaultdict
 from itertools import product
 
 import requests
-from bs4 import BeautifulSoup
+from monty.dev import requires
 from monty.serialization import dumpfn, loadfn
 from ruamel import yaml
 
 from pymatgen.core import Element, get_el_sp
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 ptable_yaml_path = "periodic_table.yaml"
 
@@ -74,13 +77,12 @@ def parse_ionic_radii():
         el = tokens[2]
 
         ionic_radii = {}
-        for j in range(3, len(tokens)):
-            match = re.match(r"^\s*([0-9\.]+)", tokens[j])
-            if match:
-                ionic_radii[int(header[j])] = float(match.group(1))
+        for tok_idx in range(3, len(tokens)):
+            if match := re.match(r"^\s*([0-9\.]+)", tokens[tok_idx]):
+                ionic_radii[int(header[tok_idx])] = float(match.group(1))
 
         if el in data:
-            data[el]["Ionic_radii" + suffix] = ionic_radii
+            data[el][f"Ionic_radii{suffix}"] = ionic_radii
             if suffix == "_hs":
                 data[el]["Ionic_radii"] = ionic_radii
         else:
@@ -154,7 +156,7 @@ def parse_shannon_radii():
     sheet = wb["Sheet1"]
     i = 2
     el = charge = cn = None
-    radii = collections.defaultdict(dict)
+    radii = defaultdict(dict)
     while sheet[f"E{i}"].value:
         if sheet[f"A{i}"].value:
             el = sheet[f"A{i}"].value
@@ -231,10 +233,11 @@ def gen_iupac_ordering():
         periodic_table[el]["IUPAC ordering"] = iupac_ordering_dict[get_el_sp(el)]
 
 
+@requires(BeautifulSoup, "BeautifulSoup must be installed to use this method.")
 def add_electron_affinities():
     """Update the periodic table data file with electron affinities."""
 
-    req = requests.get("https://wikipedia.org/wiki/Electron_affinity_(data_page)")
+    req = requests.get("https://wikipedia.org/wiki/Electron_affinity_(data_page)", timeout=600)
     soup = BeautifulSoup(req.text, "html.parser")
     table = None
     for table in soup.find_all("table"):
@@ -277,7 +280,7 @@ def add_ionization_energies():
     for table in soup.find_all("table"):
         if "Hydrogen" in table.text:
             break
-    data = collections.defaultdict(list)
+    data = defaultdict(list)
     for row in table.find_all("tr"):
         row = [td.get_text().strip() for td in row.find_all("td")]
         if row:

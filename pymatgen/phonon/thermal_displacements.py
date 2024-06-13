@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from functools import partial
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 from monty.json import MSONable
@@ -22,6 +22,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from os import PathLike
+    from typing import Literal
 
     from numpy.typing import ArrayLike
     from typing_extensions import Self
@@ -40,7 +41,7 @@ space_groups = {sub_spgrp(k): k for k in SYMM_DATA["space_group_encoding"]}  # t
 
 
 class ThermalDisplacementMatrices(MSONable):
-    """Class to handle thermal displacement matrices
+    """Handle thermal displacement matrices
     This class stores thermal displacement matrices in Ucart format.
 
     An earlier implementation based on Matlab can be found here:
@@ -208,7 +209,7 @@ class ThermalDisplacementMatrices(MSONable):
         return U1U2U3
 
     def write_cif(self, filename: str) -> None:
-        """Writes a cif including thermal displacements.
+        """Write a cif including thermal displacements.
 
         Args:
             filename: name of the cif file
@@ -461,7 +462,7 @@ class ThermalDisplacementMatrices(MSONable):
     def to_structure_with_site_properties_Ucif(self) -> Structure:
         """Transfers this object into a structure with site properties (Ucif).
         This is useful for sorting the atoms in the structure including site properties.
-        E.g., with code like this:
+        e.g. with code like this:
         def sort_order(site):
             return [site.specie.X, site.frac_coords[0], site.frac_coords[1], site.frac_coords[2]]
         new_structure0 = Structure.from_sites(sorted(structure0, key=sort_order)).

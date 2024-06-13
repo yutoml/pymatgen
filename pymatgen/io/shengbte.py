@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from monty.dev import requires
@@ -12,13 +12,15 @@ from monty.json import MSONable
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import Kpoints
 
-if TYPE_CHECKING:
-    from typing_extensions import Self
-
 try:
     import f90nml
 except ImportError:
     f90nml = None
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from typing_extensions import Self
 
 __author__ = "Rees Chang, Alex Ganose"
 __copyright__ = "Copyright 2019, The Materials Project"
@@ -28,9 +30,8 @@ __date__ = "June 27, 2019"
 
 
 class Control(MSONable, dict):
-    """
-    Class for reading, updating, and writing ShengBTE CONTROL files.
-    See  https://bitbucket.org/sousaw/shengbte/src/master/ for more
+    """Read, update, and write ShengBTE CONTROL files.
+    See https://bitbucket.org/sousaw/shengbte/src/master/ for more
     detailed description and default values of CONTROL arguments.
     """
 
@@ -151,8 +152,7 @@ class Control(MSONable, dict):
 
     @classmethod
     def from_dict(cls, control_dict: dict) -> Self:
-        """
-        Write a CONTROL file from a Python dictionary. Description and default
+        """Write a CONTROL file from a Python dictionary. Description and default
         parameters can be found at
         https://bitbucket.org/sousaw/shengbte/src/master/.
         Note some parameters are mandatory. Optional parameters default here to
@@ -168,8 +168,7 @@ class Control(MSONable, dict):
         "ShengBTE Control object requires f90nml to be installed. Please get it at https://pypi.org/project/f90nml.",
     )
     def to_file(self, filename: str = "CONTROL") -> None:
-        """
-        Writes ShengBTE CONTROL file from 'Control' object.
+        """Write ShengBTE CONTROL file from 'Control' object.
 
         Args:
             filename: A file name.
@@ -199,8 +198,7 @@ class Control(MSONable, dict):
 
     @classmethod
     def from_structure(cls, structure: Structure, reciprocal_density: int | None = 50000, **kwargs) -> Self:
-        """
-        Get a ShengBTE control object from a structure.
+        """Get a ShengBTE control object from a structure.
 
         Args:
             structure: A structure object.
@@ -238,8 +236,7 @@ class Control(MSONable, dict):
         return Control(**control_dict)
 
     def get_structure(self) -> Structure:
-        """
-        Get a pymatgen Structure from a ShengBTE control object.
+        """Get a pymatgen Structure from a ShengBTE control object.
 
         The control object must have the "lattvec", "types", "elements", and
         "positions" settings otherwise an error will be thrown.
@@ -264,7 +261,7 @@ class Control(MSONable, dict):
         return Structure(cell, species, self["positions"])
 
     def as_dict(self):
-        """Returns: MSONable dict."""
+        """Get MSONable dict."""
         return dict(self)
 
 

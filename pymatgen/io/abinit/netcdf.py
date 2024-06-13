@@ -92,7 +92,7 @@ class NetcdfReader:
         self.ngroups = len(list(self.walk_tree()))
 
         # Always return non-masked numpy arrays.
-        # Slicing a ncvar returns a MaskedArrray and this is really annoying
+        # Slicing a ncvar returns a MaskedArray and this is really annoying
         # because it can lead to unexpected behavior in e.g. calls to np.matmul!
         # See also https://github.com/Unidata/netcdf4-python/issues/785
         self.rootgrp.set_auto_mask(False)
@@ -132,8 +132,7 @@ class NetcdfReader:
                 print(child)
 
     def read_dimvalue(self, dimname, path="/", default=NO_DEFAULT):
-        """
-        Returns the value of a dimension.
+        """Get the value of a dimension.
 
         Args:
             dimname: Name of the variable
@@ -157,8 +156,7 @@ class NetcdfReader:
         return list(group.variables)
 
     def read_value(self, varname, path="/", cmode=None, default=NO_DEFAULT):
-        """
-        Returns the values of variable with name varname in the group specified by path.
+        """Get the values of variable with name varname in the group specified by path.
 
         Args:
             varname: Name of the variable
@@ -192,7 +190,7 @@ class NetcdfReader:
         raise ValueError(f"Wrong value for {cmode=}")
 
     def read_variable(self, varname, path="/"):
-        """Returns the variable with name varname in the group specified by path."""
+        """Get the variable with name varname in the group specified by path."""
         return self._read_variables(varname, path=path)[0]
 
     def _read_dimensions(self, *dim_names, **kwargs):
@@ -256,11 +254,11 @@ class EtsfReader(NetcdfReader):
         return symbols
 
     def type_idx_from_symbol(self, symbol):
-        """Returns the type index from the chemical symbol. Note python convention."""
+        """Get the type index from the chemical symbol. Note python convention."""
         return self.chemical_symbols.index(symbol)
 
     def read_structure(self, cls=Structure):
-        """Returns the crystalline structure stored in the rootgrp."""
+        """Get the crystalline structure stored in the rootgrp."""
         return structure_from_ncdata(self, cls=cls)
 
     def read_abinit_xcfunc(self):
@@ -275,30 +273,31 @@ class EtsfReader(NetcdfReader):
         Return AbinitHeader
         """
         dct = {}
-        for hvar in _HDR_VARIABLES.values():
-            ncname = hvar.etsf_name if hvar.etsf_name is not None else hvar.name
-            if ncname in self.rootgrp.variables:
-                dct[hvar.name] = self.read_value(ncname)
-            elif ncname in self.rootgrp.dimensions:
-                dct[hvar.name] = self.read_dimvalue(ncname)
+        for hdr_var in _HDR_VARIABLES.values():
+            nc_name = hdr_var.etsf_name if hdr_var.etsf_name is not None else hdr_var.name
+            if nc_name in self.rootgrp.variables:
+                dct[hdr_var.name] = self.read_value(nc_name)
+            elif nc_name in self.rootgrp.dimensions:
+                dct[hdr_var.name] = self.read_dimvalue(nc_name)
             else:
-                raise ValueError(f"Cannot find `{ncname}` in `{self.path}`")
+                raise ValueError(f"Cannot find `{nc_name}` in `{self.path}`")
             # Convert scalars to (well) scalars.
-            if hasattr(dct[hvar.name], "shape") and not dct[hvar.name].shape:
-                dct[hvar.name] = np.asarray(dct[hvar.name]).item()
-            if hvar.name in ("title", "md5_pseudos", "codvsn"):
+            if hasattr(dct[hdr_var.name], "shape") and not dct[hdr_var.name].shape:
+                dct[hdr_var.name] = np.asarray(dct[hdr_var.name]).item()
+            if hdr_var.name in ("title", "md5_pseudos", "codvsn"):
                 # Convert array of numpy bytes to list of strings
-                if hvar.name == "codvsn":
-                    dct[hvar.name] = "".join(bs.decode("utf-8").strip() for bs in dct[hvar.name])
+                if hdr_var.name == "codvsn":
+                    dct[hdr_var.name] = "".join(bs.decode("utf-8").strip() for bs in dct[hdr_var.name])
                 else:
-                    dct[hvar.name] = ["".join(bs.decode("utf-8") for bs in astr).strip() for astr in dct[hvar.name]]
+                    dct[hdr_var.name] = [
+                        "".join(bs.decode("utf-8") for bs in astr).strip() for astr in dct[hdr_var.name]
+                    ]
 
         return AbinitHeader(dct)
 
 
 def structure_from_ncdata(ncdata, site_properties=None, cls=Structure):
-    """
-    Reads and returns a pymatgen structure from a NetCDF file
+    """Read and return a pymatgen structure from a NetCDF file
     containing crystallographic data in the ETSF-IO format.
 
     Args:
@@ -462,8 +461,7 @@ class AbinitHeader(AttrDict):
         return self.to_str()
 
     def to_str(self, verbose=0, title=None, **kwargs):
-        """
-        String representation. kwargs are passed to `pprint.pformat`.
+        """String representation. kwargs are passed to `pprint.pformat`.
 
         Args:
             verbose: Verbosity level

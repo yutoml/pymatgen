@@ -65,11 +65,11 @@ class AflowPrototypeMatcher:
     @staticmethod
     def _match_prototype(structure_matcher, structure):
         tags = []
-        for d in AFLOW_PROTOTYPE_LIBRARY:
-            struct = d["snl"].structure
+        for dct in AFLOW_PROTOTYPE_LIBRARY:
+            struct = dct["snl"].structure
             match = structure_matcher.fit_anonymous(struct, structure)
             if match:
-                tags.append(d)
+                tags.append(dct)
         return tags
 
     def _match_single_prototype(self, structure: Structure):
@@ -89,8 +89,7 @@ class AflowPrototypeMatcher:
         return tags
 
     def get_prototypes(self, structure: Structure) -> list | None:
-        """
-        Get prototype(s) structures for a given input structure. If you use this method in
+        """Get prototype(s) structures for a given input structure. If you use this method in
         your work, please cite the appropriate AFLOW publication:
 
         Mehl, M. J., Hicks, D., Toher, C., Levy, O., Hanson, R. M., Hart, G., & Curtarolo,

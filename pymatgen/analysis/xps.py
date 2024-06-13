@@ -18,8 +18,8 @@ This version contains all detailed information for all orbitals.
 
 from __future__ import annotations
 
-import collections
 import warnings
+from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -49,7 +49,7 @@ due.cite(
 def _load_cross_sections(fname):
     data = pd.read_csv(fname)
 
-    dct = collections.defaultdict(dict)
+    dct = defaultdict(dict)
     for row in data.itertuples():
         sym = row.element
         el = Element(sym)
@@ -72,7 +72,7 @@ CROSS_SECTIONS = _load_cross_sections(Path(__file__).parent / "atomic_subshell_p
 
 
 class XPS(Spectrum):
-    """Class representing an X-ray photoelectron spectra."""
+    """An X-ray photoelectron spectra."""
 
     XLABEL = "Binding Energy (eV)"
     YLABEL = "Intensity"
@@ -86,7 +86,7 @@ class XPS(Spectrum):
             sigma: Smearing for Gaussian.
 
         Returns:
-            XPS
+            XPS: X-ray photoelectron spectrum.
         """
         total = np.zeros(dos.energies.shape)
         for el in dos.structure.composition:

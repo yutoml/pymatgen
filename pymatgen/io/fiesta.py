@@ -1,11 +1,9 @@
 """
 This module implements input and output for Fiesta (http://perso.neel.cnrs.fr/xavier.blase/fiesta/index.html).
 
-and
-
--Nwchem2Fiesta class: to create the input files needed for a Fiesta run
--Fiesta_run: run gw_fiesta and bse_fiesta
--Localised Basis set reader
+- Nwchem2Fiesta: create the input files needed for a Fiesta run
+- FiestaRun: run gw_fiesta and bse_fiesta
+- Localized BasisSetReader
 """
 
 from __future__ import annotations
@@ -27,6 +25,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self
 
+    from pymatgen.util.typing import Tuple3Ints
+
 __author__ = "ndardenne"
 __copyright__ = "Copyright 2012, The Materials Project"
 __version__ = "0.1"
@@ -35,8 +35,7 @@ __date__ = "24/5/15"
 
 
 class Nwchem2Fiesta(MSONable):
-    """
-    To run NWCHEM2FIESTA inside python:
+    """To run NWCHEM2FIESTA inside python:
 
     If nwchem.nw is the input, nwchem.out the output, and structure.movecs the
     "movecs" file, the syntax to run NWCHEM2FIESTA is: NWCHEM2FIESTA
@@ -45,11 +44,10 @@ class Nwchem2Fiesta(MSONable):
 
     def __init__(self, folder, filename="nwchem", log_file="log_n2f"):
         """
-        folder: where are stored the nwchem
-        filename: name of nwchem files read by NWCHEM2FIESTA (filename.nw, filename.nwout and filename.movecs)
-        logfile: logfile of NWCHEM2FIESTA.
-
-        the run method launches NWCHEM2FIESTA
+        Args:
+            folder: where are stored the nwchem
+            filename: name of nwchem files read by NWCHEM2FIESTA (filename.nw, filename.nwout and filename.movecs)
+            logfile: logfile of NWCHEM2FIESTA.
         """
         self.folder = folder
         self.filename = filename
@@ -61,7 +59,7 @@ class Nwchem2Fiesta(MSONable):
         self._nwchemmovecs_fn = f"{filename}.movecs"
 
     def run(self):
-        """Performs actual NWCHEM2FIESTA run."""
+        """Perform actual NWCHEM2FIESTA run."""
         init_folder = os.getcwd()
         os.chdir(self.folder)
 
@@ -107,9 +105,7 @@ class FiestaRun(MSONable):
         otherwise it breaks.
     """
 
-    def __init__(
-        self, folder: str | None = None, grid: tuple[int, int, int] = (2, 2, 2), log_file: str = "log"
-    ) -> None:
+    def __init__(self, folder: str | None = None, grid: Tuple3Ints = (2, 2, 2), log_file: str = "log") -> None:
         """
         Args:
             folder: Folder to look for runs.
@@ -121,7 +117,7 @@ class FiestaRun(MSONable):
         self.grid = grid
 
     def run(self):
-        """Performs FIESTA (gw) run."""
+        """Perform FIESTA (gw) run."""
         if len(self.grid) == 3:
             self.mpi_procs = self.grid[0] * self.grid[1] * self.grid[2]
             self._gw_run()
@@ -132,7 +128,7 @@ class FiestaRun(MSONable):
             raise ValueError("Wrong grid size: must be [nrow, ncolumn, nslice] for gw of [nrow, nslice] for bse")
 
     def _gw_run(self):
-        """Performs FIESTA (gw) run."""
+        """Perform FIESTA (gw) run."""
         init_folder = os.getcwd()
         if self.folder != init_folder:
             os.chdir(self.folder)
@@ -155,7 +151,7 @@ class FiestaRun(MSONable):
             os.chdir(init_folder)
 
     def bse_run(self):
-        """Performs BSE run."""
+        """Perform BSE run."""
         init_folder = os.getcwd()
         if self.folder != init_folder:
             os.chdir(self.folder)
@@ -356,8 +352,7 @@ class FiestaInput(MSONable):
                     shutil.copyfile(f"{auxiliary_folder}/{file}", f"{folder}/{specie}2.ion")
 
     def set_gw_options(self, nv_band=10, nc_band=10, n_iteration=5, n_grid=6, dE_grid=0.5):
-        """
-        Set parameters in cell.in for a GW computation
+        """Set parameters in cell.in for a GW computation
 
         Args:
             nv__band: number of valence bands to correct with GW
@@ -378,8 +373,7 @@ class FiestaInput(MSONable):
         return "makedirs FULL_BSE_Densities folder"
 
     def set_bse_options(self, n_excitations=10, nit_bse=200):
-        """
-        Set parameters in cell.in for a BSE computation
+        """Set parameters in cell.in for a BSE computation
 
         Args:
             nv_bse: number of valence bands
@@ -414,7 +408,7 @@ class FiestaInput(MSONable):
 
     @property
     def infos_on_system(self):
-        """Returns infos on initial parameters as in the log file of Fiesta."""
+        """Infos on initial parameters as in the log file of Fiesta."""
         lst = [
             "=========================================",
             "Reading infos on system:",
@@ -466,7 +460,7 @@ class FiestaInput(MSONable):
 
     @property
     def molecule(self):
-        """Returns molecule associated with this FiestaInput."""
+        """Molecule associated with this FiestaInput."""
         return self._mol
 
     def __str__(self):
@@ -534,8 +528,7 @@ $geometry
         )
 
     def write_file(self, filename: str | Path) -> None:
-        """
-        Write FiestaInput to a file
+        """Write FiestaInput to a file
 
         Args:
             filename: Filename.
@@ -692,7 +685,7 @@ $geometry
         while i != 0:
             line = lines.pop(0).strip()
             tokens = line.split()
-            coords.append([float(j) for j in tokens[0:3]])
+            coords.append([float(j) for j in tokens[:3]])
             species.append(atname[int(tokens[3]) - 1])
             i -= 1
 

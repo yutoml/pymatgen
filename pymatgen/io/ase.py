@@ -51,18 +51,18 @@ __date__ = "Mar 8, 2012"
 class MSONAtoms(Atoms, MSONable):
     """A custom subclass of ASE Atoms that is MSONable, including `.as_dict()` and `.from_dict()` methods."""
 
-    def as_dict(atoms: Atoms) -> dict[str, Any]:
+    def as_dict(self: Atoms) -> dict[str, Any]:
         # Normally, we would want to this to be a wrapper around atoms.todict() with @module and
         # @class key-value pairs inserted. However, atoms.todict()/atoms.fromdict() is not meant
         # to be used in a round-trip fashion and does not work properly with constraints.
         # See ASE issue #1387.
-        atoms_no_info = atoms.copy()
+        atoms_no_info = self.copy()
         atoms_no_info.info = {}
         return {
             "@module": "pymatgen.io.ase",
             "@class": "MSONAtoms",
             "atoms_json": encode(atoms_no_info),
-            "atoms_info": jsanitize(atoms.info, strict=True),
+            "atoms_info": jsanitize(self.info, strict=True),
         }
 
     @classmethod
@@ -72,7 +72,7 @@ class MSONAtoms(Atoms, MSONable):
         # to be used in a round-trip fashion and does not work properly with constraints.
         # See ASE issue #1387.
         mson_atoms = cls(decode(dct["atoms_json"]))
-        atoms_info = MontyDecoder().process_decoded(dct["atoms_info"])
+        atoms_info = MontyDecoder().process_decoded(dct.get("atoms_info", {}))
         mson_atoms.info = atoms_info
         return mson_atoms
 
@@ -84,8 +84,7 @@ class AseAtomsAdaptor:
 
     @staticmethod
     def get_atoms(structure: SiteCollection, msonable: bool = True, **kwargs) -> MSONAtoms | Atoms:
-        """
-        Returns ASE Atoms object from pymatgen structure or molecule.
+        """Get ASE Atoms object from pymatgen structure or molecule.
 
         Args:
             structure (SiteCollection): pymatgen Structure or Molecule
@@ -115,8 +114,8 @@ class AseAtomsAdaptor:
         if msonable:
             atoms = MSONAtoms(atoms)
 
-        if "tags" in structure.site_properties:
-            atoms.set_tags(structure.site_properties["tags"])
+        if tags := structure.site_properties.get("tags"):
+            atoms.set_tags(tags)
 
         # Set the site magmoms in the ASE Atoms object
         # Note: ASE distinguishes between initial and converged
@@ -224,8 +223,7 @@ class AseAtomsAdaptor:
 
     @staticmethod
     def get_structure(atoms: Atoms, cls: type[Structure] = Structure, **cls_kwargs) -> Structure:
-        """
-        Returns pymatgen structure from ASE Atoms.
+        """Get pymatgen structure from ASE Atoms.
 
         Args:
             atoms: ASE Atoms object
@@ -354,8 +352,7 @@ class AseAtomsAdaptor:
 
     @staticmethod
     def get_molecule(atoms: Atoms, cls: type[Molecule] = Molecule, **cls_kwargs) -> Molecule:
-        """
-        Returns pymatgen molecule from ASE Atoms.
+        """Get pymatgen molecule from ASE Atoms.
 
         Args:
             atoms: ASE Atoms object

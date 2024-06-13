@@ -44,8 +44,7 @@ template_dir = f"{module_dir}/templates"
 
 
 class LammpsInputFile(InputFile):
-    """
-    Class representing a LAMMPS input settings file, e.g. in.lammps.
+    """LAMMPS input settings file such as `in.lammps`.
     Allows for LAMMPS input generation in line/stage wise manner. A stage
     here is defined as a block of LAMMPS input commands usually performing a
     specific task during the simulation such as energy minimization or
@@ -60,7 +59,7 @@ class LammpsInputFile(InputFile):
     ```
     stages = [
         {"stage_name": "Stage 1", "commands": [(cmd1, args1), (cmd2, args2)]},
-        {"stage_name": "Stage 2", "commands": [(cmd3, args3)]}
+        {"stage_name": "Stage 2", "commands": [(cmd3, args3)]},
     ]
     ```
     where cmd's are the LAMMPS command names (e.g., "units", or "pair_coeff")
@@ -90,13 +89,12 @@ class LammpsInputFile(InputFile):
 
     @property
     def nstages(self) -> int:
-        """Returns the number of stages in the current LammpsInputFile."""
+        """The number of stages in the current LammpsInputFile."""
         return len(self.stages)
 
     @property
     def ncomments(self) -> int:
-        """
-        Returns the number of comments in the current LammpsInputFile. Includes the blocks of comments as well
+        """The number of comments in the current LammpsInputFile. Includes the blocks of comments as well
         as inline comments (comment lines within blocks of LAMMPS commands).
         """
         n_comments = 0
@@ -137,8 +135,7 @@ class LammpsInputFile(InputFile):
         return args if len(args) != 1 else args[0]
 
     def contains_command(self, command: str, stage_name: str | None = None) -> bool:
-        """
-        Returns whether a given command is present in the LammpsInputFile.
+        """Get whether a given command is present in the LammpsInputFile.
         A stage name can be given; in this case the search will happen only for this stage.
 
         Args:
@@ -153,8 +150,7 @@ class LammpsInputFile(InputFile):
     def set_args(
         self, command: str, argument: str, stage_name: str | None = None, how: str | int | list[int] = "all"
     ) -> None:
-        """
-        Sets the arguments for the given command to the given string.
+        """Set the arguments for the given command to the given string.
         If the command is not found, nothing is done. Use LammpsInputFile.add_commands instead.
         If a stage name is specified, it will be replaced or set only for this stage.
         If no stage name is given, it will apply the change in all of them that contain the given command.
@@ -162,8 +158,8 @@ class LammpsInputFile(InputFile):
         either the first occurrence, all of them, or the index of the occurrence.
 
         Args:
-            command (str): String representing the command to change, e.g., "units".
-            argument (str): String with the new value for the command, e.g., "atomic".
+            command (str): String representing the command to change, e.g. "units".
+            argument (str): String with the new value for the command, e.g. "atomic".
             stage_name (str): String giving the stage name where the change should take place.
             how (str or int or list): "all" for changing all occurrences of the command within the stage_name
                 or the whole InputFile, "first" for the first occurrence, int i for the i-th time the command
@@ -210,7 +206,7 @@ class LammpsInputFile(InputFile):
             ```
             your_input_file.add_stage(
                 commands=["pair_coeff 1 1 morse 0.0580 3.987 3.404", "pair_coeff 1 4 morse 0.0408 1.399 3.204"],
-                stage_name="Definition of the force field"
+                stage_name="Definition of the force field",
             )
             ```
             or
@@ -220,7 +216,7 @@ class LammpsInputFile(InputFile):
                     "stage_name": "Definition of the force field",
                     "commands": [
                         ("pair_coeff", "1 1 morse 0.0580 3.987 3.404"),
-                        ("pair_coeff", "1 4 morse 0.0408 1.399 3.204")
+                        ("pair_coeff", "1 4 morse 0.0408 1.399 3.204"),
                     ],
                 }
             )
@@ -234,7 +230,7 @@ class LammpsInputFile(InputFile):
                 "min_style cg",
                 "fix 1 all box/relax iso 0.0 vmax 0.001",
                 "minimize 1.0e-16 1.0e-16 5000 10000",
-                "write_data run.data"
+                "write_data run.data",
             ]
             ```
             or a dictionary such as `{"thermo": 1, ...}`, or a string with a single command (e.g., "units atomic").
@@ -371,19 +367,18 @@ class LammpsInputFile(InputFile):
             to the stage "Definition of the potential", simply use
             ```
             your_input_file.add_commands(
-                stage_name="Definition of the potential",
-                commands="pair_coeff 1 1 morse 0.0580 3.987 3.404"
+                stage_name="Definition of the potential", commands="pair_coeff 1 1 morse 0.0580 3.987 3.404"
             )
             ```
-            To add multiple commands, use a dict or a list, e.g.,
+            To add multiple commands, use a dict or a list, e.g.
             ```
             your_input_file.add_commands(
                 stage_name="Definition of the potential",
-                commands=["pair_coeff 1 1 morse 0.0580 3.987 3.404", "units atomic"]
+                commands=["pair_coeff 1 1 morse 0.0580 3.987 3.404", "units atomic"],
             )
             your_input_file.add_commands(
                 stage_name="Definition of the potential",
-                commands={"pair_coeff": "1 1 morse 0.0580 3.987 3.404", "units": "atomic"}
+                commands={"pair_coeff": "1 1 morse 0.0580 3.987 3.404", "units": "atomic"},
             )
             ```
 
@@ -486,8 +481,7 @@ class LammpsInputFile(InputFile):
         self.stages += new_list_to_add
 
     def get_str(self, ignore_comments: bool = False, keep_stages: bool = True) -> str:
-        """
-        Generates and ² the string representation of the LammpsInputFile.
+        """Generate and ² the string representation of the LammpsInputFile.
         Stages are separated by empty lines.
         The headers of the stages will be put in comments preceding each stage.
         Other comments will be put inline within stages, where they have been added.
@@ -510,7 +504,7 @@ class LammpsInputFile(InputFile):
                 # Print first the name of the stage in a comment.
                 # We print this even if ignore_comments is True.
                 if "Comment" not in stage["stage_name"] and len(self.stages) > 1:
-                    lammps_input += "\n# " + stage["stage_name"] + "\n"
+                    lammps_input += f"\n# {stage['stage_name']}\n"
 
                 # In case of a block of comment, the header is not printed (useless)
                 else:
@@ -524,8 +518,7 @@ class LammpsInputFile(InputFile):
         return lammps_input
 
     def write_file(self, filename: str | PathLike, ignore_comments: bool = False, keep_stages: bool = True) -> None:
-        """
-        Writes the input file.
+        """Write LAMMPS input file.
 
         Args:
             filename (str or path): The filename to output to, including path.
@@ -572,7 +565,7 @@ class LammpsInputFile(InputFile):
                 sequence += next_symbol
                 idx += 1
                 next_symbol = contents[index + idx]
-            contents = contents.replace(sequence + "\n", "")
+            contents = contents.replace(f"{sequence}\n", "")
 
         # Remove unwanted lines from the string
         lines = cls._clean_lines(contents.splitlines(), ignore_comments=ignore_comments)
@@ -699,16 +692,13 @@ class LammpsInputFile(InputFile):
             to the stage "Definition of the potential", simply use
             ```
             your_input_file._add_command(
-                stage_name="Definition of the potential",
-                command="pair_coeff 1 1 morse 0.0580 3.987 3.404"
+                stage_name="Definition of the potential", command="pair_coeff 1 1 morse 0.0580 3.987 3.404"
             )
             ```
             or
             ```
             your_input_file._add_command(
-                stage_name="Definition of the potential",
-                command="pair_coeff",
-                args="1 1 morse 0.0580 3.987 3.404"
+                stage_name="Definition of the potential", command="pair_coeff", args="1 1 morse 0.0580 3.987 3.404"
             )
             ```
 
@@ -852,8 +842,7 @@ class LammpsInputFile(InputFile):
 
 
 class LammpsRun(MSONable):
-    """
-    Examples for various simple LAMMPS runs with given simulation box,
+    """Examples for various simple LAMMPS runs with given simulation box,
     force field and a few more settings. Experienced LAMMPS users should
     consider using write_lammps_inputs method with more sophisticated
     templates.
@@ -866,9 +855,9 @@ class LammpsRun(MSONable):
         Args:
             script_template (str): String template for input script
                 with placeholders. The format for placeholders has to
-                be '$variable_name', e.g., '$temperature'
+                be '$variable_name', e.g. '$temperature'
             settings (dict): Contains values to be written to the
-                placeholders, e.g., {'temperature': 1}.
+                placeholders, e.g. {'temperature': 1}.
             data (LammpsData or str): Data file as a LammpsData
                 instance or path to an existing data file. Default to
                 None, i.e., no data file supplied. Useful only when
@@ -881,8 +870,7 @@ class LammpsRun(MSONable):
         self.script_filename = script_filename
 
     def write_inputs(self, output_dir: str, **kwargs) -> None:
-        """
-        Writes all input files (input script, and data if needed).
+        """Write all input files (input script, and data if needed).
         Other supporting files are not handled at this moment.
 
         Args:
@@ -907,8 +895,7 @@ class LammpsRun(MSONable):
         nsteps: int,
         other_settings: dict | None = None,
     ) -> LammpsRun:
-        r"""
-        Example for a simple MD run based on template md.template.
+        r"""Example for a simple MD run based on template md.template.
 
         Args:
             data (LammpsData or str): Data file as a LammpsData
@@ -935,8 +922,7 @@ class LammpsRun(MSONable):
 
 
 class LammpsTemplateGen(TemplateInputGen):
-    """
-    Creates an InputSet object for a LAMMPS run based on a template file.
+    """Create an InputSet object for a LAMMPS run based on a template file.
     The input script is constructed by substituting variables into placeholders
     in the template file using python's Template.safe_substitute() function.
     The data file containing coordinates and topology information can be provided
@@ -960,9 +946,9 @@ class LammpsTemplateGen(TemplateInputGen):
         Args:
             script_template: String template for input script with
                 placeholders. The format for placeholders has to be
-                '$variable_name', e.g., '$temperature'
+                '$variable_name', e.g. '$temperature'
             settings: Contains values to be written to the
-                placeholders, e.g., {'temperature': 1}. Default to None.
+                placeholders, e.g. {'temperature': 1}. Default to None.
             data: Data file as a LammpsData instance. Default to None, i.e., no
                 data file supplied. Note that a matching 'read_data' command
                 must be provided in the script template in order for the data
@@ -977,7 +963,7 @@ class LammpsTemplateGen(TemplateInputGen):
         return input_set
 
 
-@deprecated(LammpsTemplateGen, "This method will be retired in the future. Consider using LammpsTemplateSet instead.")
+@deprecated(LammpsTemplateGen, "This function will be removed in the future.")
 def write_lammps_inputs(
     output_dir: str,
     script_template: str,
@@ -999,9 +985,9 @@ def write_lammps_inputs(
         output_dir (str): Directory to output the input files.
         script_template (str): String template for input script with
             placeholders. The format for placeholders has to be
-            '$variable_name', e.g., '$temperature'
+            '$variable_name', e.g. '$temperature'
         settings (dict): Contains values to be written to the
-            placeholders, e.g., {'temperature': 1}. Default to None.
+            placeholders, e.g. {'temperature': 1}. Default to None.
         data (LammpsData or str): Data file as a LammpsData instance or
             path to an existing data file. Default to None, i.e., no
             data file supplied. Useful only when read_data cmd is in
@@ -1034,10 +1020,9 @@ def write_lammps_inputs(
         ... timestep        0.005
         ...
         ... run             $nsteps'''
-        >>> write_lammps_inputs('.', eam_template, settings={'temperature': 1600.0, 'nsteps': 100})
-        >>> with open('in.lammps') as file:
+        >>> write_lammps_inputs(".", eam_template, settings={"temperature": 1600.0, "nsteps": 100})
+        >>> with open("in.lammps") as file:
         ...     script = file.read()
-        ...
         >>> print(script)
         units           metal
         atom_style      atomic

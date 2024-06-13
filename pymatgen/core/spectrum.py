@@ -4,7 +4,7 @@ x y value pairs.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 from monty.json import MSONable
@@ -14,11 +14,14 @@ from scipy.ndimage import convolve1d
 from pymatgen.util.coord import get_linear_interpolated_value
 
 if TYPE_CHECKING:
-    from numpy.typing import ArrayLike
+    from typing import Callable, Literal
+
+    from numpy.typing import NDArray
+    from typing_extensions import Self
 
 
-def lorentzian(x, x_0: float = 0, sigma: float = 1.0):
-    """
+def lorentzian(x: NDArray, x_0: float = 0, sigma: float = 1.0) -> NDArray:
+    """The Lorentzian smearing function.
 
     Args:
         x: x values
@@ -32,7 +35,7 @@ def lorentzian(x, x_0: float = 0, sigma: float = 1.0):
 
 
 class Spectrum(MSONable):
-    """Base class for any type of xas, essentially just x, y values. Examples
+    """Base class for any type of XAS, essentially just x, y values. Examples
     include XRD patterns, XANES, EXAFS, NMR, DOS, etc.
 
     Implements basic tools like application of smearing, normalization, addition
@@ -46,14 +49,14 @@ class Spectrum(MSONable):
     XLABEL = "x"
     YLABEL = "y"
 
-    def __init__(self, x: ArrayLike, y: ArrayLike, *args, **kwargs) -> None:
+    def __init__(self, x: NDArray, y: NDArray, *args, **kwargs) -> None:
         """
         Args:
             x (ndarray): A ndarray of N values.
             y (ndarray): A ndarray of N x k values. The first dimension must be
                 the same as that of x. Each of the k values are interpreted as separate.
             *args: All subclasses should provide args other than x and y
-                when calling super, e.g., super().__init__(
+                when calling super, e.g. super().__init__(
                 x, y, arg1, arg2, kwarg1=val1, ..). This guarantees the +, -, *,
                 etc. operators work properly.
             **kwargs: Same as that for *args.
@@ -66,7 +69,7 @@ class Spectrum(MSONable):
         self._args = args
         self._kwargs = kwargs
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> NDArray:
         if name == self.XLABEL.lower():
             return self.x
         if name == self.YLABEL.lower():
@@ -76,12 +79,94 @@ class Spectrum(MSONable):
     def __len__(self) -> int:
         return self.ydim[0]
 
-    def normalize(self, mode: Literal["max", "sum"] = "max", value: float = 1.0) -> None:
+    def __add__(self, other: Self) -> Self:
+        """Add two Spectrum object together. Checks that x scales are the same.
+        Otherwise, a ValueError is thrown.
+
+        Args:
+            other: Another Spectrum object
+
+        Returns:
+            Sum of the two Spectrum objects
+        """
+        if not all(np.equal(self.x, other.x)):
+            raise ValueError("X axis values are not compatible!")
+
+        return type(self)(self.x, self.y + other.y, *self._args, **self._kwargs)
+
+    def __sub__(self, other: Self) -> Self:
+        """Subtract one Spectrum object from another. Checks that x scales are
+        the same.
+        Otherwise, a ValueError is thrown.
+
+        Args:
+            other: Another Spectrum object
+
+        Returns:
+            Subtraction of the two Spectrum objects
+        """
+        if not all(np.equal(self.x, other.x)):
+            raise ValueError("X axis values are not compatible!")
+
+        return type(self)(self.x, self.y - other.y, *self._args, **self._kwargs)
+
+    def __mul__(self, other: Self) -> Self:
+        """Scale the Spectrum's y values.
+
+        Args:
+            other: scalar, The scale amount
+
+        Returns:
+            Spectrum object with y values scaled
+        """
+        return type(self)(self.x, other * self.y, *self._args, **self._kwargs)
+
+    __rmul__ = __mul__
+
+    def __truediv__(self, other: Self) -> Self:
+        """True division of y.
+
+        Args:
+            other: The divisor.
+
+        Returns:
+            Spectrum object with y values divided
+        """
+        return type(self)(self.x, self.y.__truediv__(other), *self._args, **self._kwargs)
+
+    def __floordiv__(self, other: Self) -> Self:
+        """True division of y.
+
+        Args:
+            other: The divisor.
+
+        Returns:
+            Spectrum object with y values divided
+        """
+        return type(self)(self.x, self.y.__floordiv__(other), *self._args, **self._kwargs)
+
+    __div__ = __truediv__
+
+    def __str__(self) -> str:
+        """String containing values and labels of spectrum object for
+        plotting.
+        """
+        return f"{type(self).__name__}\n{self.XLABEL}: {self.x}\n{self.YLABEL}: {self.y}"
+
+    def __repr__(self) -> str:
+        """A printable representation of the class."""
+        return str(self)
+
+    def normalize(
+        self,
+        mode: Literal["max", "sum"] = "max",
+        value: float = 1.0,
+    ) -> None:
         """Normalize the spectrum with respect to the sum of intensity.
 
         Args:
             mode ("max" | "sum"): Normalization mode. "max" sets the max y value to value,
-                e.g., in XRD patterns. "sum" sets the sum of y to a value, i.e., like a
+                e.g. in XRD patterns. "sum" sets the sum of y to a value, i.e., like a
                 probability density.
             value (float): Value to normalize to. Defaults to 1.
         """
@@ -94,7 +179,11 @@ class Spectrum(MSONable):
 
         self.y /= factor / value
 
-    def smear(self, sigma: float = 0.0, func: str | Callable = "gaussian") -> None:
+    def smear(
+        self,
+        sigma: float = 0.0,
+        func: Literal["gaussian", "lorentzian"] | Callable = "gaussian",
+    ) -> None:
         """Apply Gaussian/Lorentzian smearing to spectrum y value.
 
         Args:
@@ -122,7 +211,7 @@ class Spectrum(MSONable):
             self.y *= total / np.sum(self.y, axis=0)  # renormalize to maintain the same integrated sum as before.
 
     def get_interpolated_value(self, x: float) -> float | list[float]:
-        """Returns an interpolated y value for a particular x value.
+        """Get an interpolated y value for a particular x value.
 
         Args:
             x: x value to return the y value for
@@ -134,85 +223,9 @@ class Spectrum(MSONable):
             return get_linear_interpolated_value(self.x, self.y, x)
         return [get_linear_interpolated_value(self.x, self.y[:, k], x) for k in range(self.ydim[1])]
 
-    def copy(self):
+    def copy(self) -> Self:
         """
         Returns:
             Copy of Spectrum object.
         """
         return type(self)(self.x, self.y, *self._args, **self._kwargs)
-
-    def __add__(self, other):
-        """Add two Spectrum object together. Checks that x scales are the same.
-        Otherwise, a ValueError is thrown.
-
-        Args:
-            other: Another Spectrum object
-
-        Returns:
-            Sum of the two Spectrum objects
-        """
-        if not all(np.equal(self.x, other.x)):
-            raise ValueError("X axis values are not compatible!")
-        return type(self)(self.x, self.y + other.y, *self._args, **self._kwargs)
-
-    def __sub__(self, other):
-        """Subtract one Spectrum object from another. Checks that x scales are
-        the same.
-        Otherwise, a ValueError is thrown.
-
-        Args:
-            other: Another Spectrum object
-
-        Returns:
-            Subtraction of the two Spectrum objects
-        """
-        if not all(np.equal(self.x, other.x)):
-            raise ValueError("X axis values are not compatible!")
-        return type(self)(self.x, self.y - other.y, *self._args, **self._kwargs)
-
-    def __mul__(self, other):
-        """Scale the Spectrum's y values.
-
-        Args:
-            other: scalar, The scale amount
-
-        Returns:
-            Spectrum object with y values scaled
-        """
-        return type(self)(self.x, other * self.y, *self._args, **self._kwargs)
-
-    __rmul__ = __mul__
-
-    def __truediv__(self, other):
-        """True division of y.
-
-        Args:
-            other: The divisor.
-
-        Returns:
-            Spectrum object with y values divided
-        """
-        return type(self)(self.x, self.y.__truediv__(other), *self._args, **self._kwargs)
-
-    def __floordiv__(self, other):
-        """True division of y.
-
-        Args:
-            other: The divisor.
-
-        Returns:
-            Spectrum object with y values divided
-        """
-        return type(self)(self.x, self.y.__floordiv__(other), *self._args, **self._kwargs)
-
-    __div__ = __truediv__
-
-    def __str__(self) -> str:
-        """Returns a string containing values and labels of spectrum object for
-        plotting.
-        """
-        return f"{type(self).__name__}\n{self.XLABEL}: {self.x}\n{self.YLABEL}: {self.y}"
-
-    def __repr__(self) -> str:
-        """Returns a printable representation of the class."""
-        return str(self)

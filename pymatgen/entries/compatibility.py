@@ -9,7 +9,7 @@ import copy
 import os
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Literal, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 from monty.design_patterns import cached_class
@@ -33,8 +33,10 @@ from pymatgen.util.due import Doi, due
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Literal
 
     from pymatgen.util.typing import CompositionLike
+
 
 __author__ = "Amanda Wang, Ryan Kingsbury, Shyue Ping Ong, Anubhav Jain, Stephen Dacek, Sai Jayaraman"
 __copyright__ = "Copyright 2012-2020, The Materials Project"
@@ -47,6 +49,22 @@ MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 MU_H2O = -2.4583  # Free energy of formation of water, eV/H2O, used by MaterialsProjectAqueousCompatibility
 MP2020_COMPAT_CONFIG = loadfn(f"{MODULE_DIR}/MP2020Compatibility.yaml")
 MP_COMPAT_CONFIG = loadfn(f"{MODULE_DIR}/MPCompatibility.yaml")
+
+# This was compiled by cross-referencing structures in Materials Project from exp_compounds.json.gz
+# used in the fitting of the MP2020 correction scheme, and applying the BVAnalyzer algorithm to
+# determine oxidation state. O and S are not included since these are treated separately.
+MP2020_ANION_OXIDATION_STATE_RANGES = {
+    "Br": (-1, -1),
+    "Cl": (-1, -1),
+    "F": (-1, -1),
+    "H": (-1, -1),
+    "I": (-1, -1),
+    "N": (-3, -2),
+    "Sb": (-3, -2),
+    "Se": (-2, -1),
+    "Si": (-4, -1),
+    "Te": (-2, -1),
+}
 
 assert (  # ping @janosh @rkingsbury on GitHub if this fails
     MP2020_COMPAT_CONFIG["Corrections"]["GGAUMixingCorrections"]["O"]
@@ -71,7 +89,7 @@ class Correction(abc.ABC):
 
     @abc.abstractmethod
     def get_correction(self, entry: AnyComputedEntry) -> EnergyAdjustment:
-        """Returns correction and uncertainty for a single entry.
+        """Get correction and uncertainty for a single entry.
 
         Args:
             entry: A ComputedEntry object.
@@ -113,7 +131,7 @@ class Correction(abc.ABC):
 
 
 class PotcarCorrection(Correction):
-    """Checks that POTCARs are valid within a pre-defined input set. This
+    """Check that POTCARs are valid within a pre-defined input set. This
     ensures that calculations performed using different InputSets are not
     compared against each other.
 
@@ -296,7 +314,7 @@ class AnionCorrection(Correction):
                 else:
                     warnings.warn(
                         "No structure or oxide_type parameter present. Note that peroxide/superoxide corrections "
-                        "are not as reliable and relies only on detection of special formulas, e.g., Li2O2."
+                        "are not as reliable and relies only on detection of special formulas, e.g. Li2O2."
                     )
                     rform = entry.reduced_formula
                     if rform in UCorrection.common_peroxides:
@@ -680,7 +698,7 @@ class CorrectionsList(Compatibility):
         return adjustment_list
 
     def get_corrections_dict(self, entry: AnyComputedEntry) -> tuple[dict[str, float], dict[str, float]]:
-        """Returns the correction values and uncertainties applied to a particular entry.
+        """Get the correction values and uncertainties applied to a particular entry.
 
         Args:
             entry: A ComputedEntry object.
@@ -699,9 +717,8 @@ class CorrectionsList(Compatibility):
         return corrections, uncertainties
 
     def get_explanation_dict(self, entry):
-        """Provides an explanation dict of the corrections that are being applied
-        for a given compatibility scheme. Inspired by the "explain" methods
-        in many database methodologies.
+        """Explain the corrections applied for a given compatibility scheme. Inspired by the
+        "explain" methods in many database methodologies.
 
         Args:
             entry: A ComputedEntry.
@@ -770,8 +787,7 @@ class MaterialsProjectCompatibility(CorrectionsList):
     """This class implements the GGA/GGA+U mixing scheme, which allows mixing of
     entries. Note that this should only be used for VASP calculations using the
     MaterialsProject parameters (see pymatgen.io.vasp.sets.MPVaspInputSet).
-    Using this compatibility scheme on runs with different parameters is not
-    valid.
+    Using this compatibility scheme on runs with different parameters is not valid.
     """
 
     def __init__(
@@ -830,6 +846,10 @@ class MaterialsProject2020Compatibility(Compatibility):
     Materials Project input set parameters (see pymatgen.io.vasp.sets.MPRelaxSet). Using
     this compatibility scheme on calculations with different parameters is not valid.
 
+    The option `strict_anions` was added due to a bug. See PR #3803 (May 2024) for
+    related discussion. This behavior may change in subsequent versions as a more comprehensive
+    fix for this issue may be found.
+
     Note: While the correction scheme is largely composition-based, the energy corrections
     applied to ComputedEntry and ComputedStructureEntry can differ for O and S-containing
     structures if entry.data['oxidation_states'] is not populated or explicitly set. This
@@ -843,6 +863,7 @@ class MaterialsProject2020Compatibility(Compatibility):
         self,
         compat_type: str = "Advanced",
         correct_peroxide: bool = True,
+        strict_anions: Literal["require_exact", "require_bound", "no_check"] = "require_bound",
         check_potcar: bool = True,
         check_potcar_hash: bool = False,
         config_file: str | None = None,
@@ -869,6 +890,15 @@ class MaterialsProject2020Compatibility(Compatibility):
             correct_peroxide: Specify whether peroxide/superoxide/ozonide
                 corrections are to be applied or not. If false, all oxygen-containing
                 compounds are assigned the 'oxide' correction. Default: True
+            strict_anions: only apply the anion corrections to anions. The option
+                "require_exact" will only apply anion corrections in cases where the
+                anion oxidation state is between the oxidation states used
+                in the experimental fitting data. The option "require_bound" will
+                define an anion as any species with an oxidation state value of <= -1.
+                This prevents the anion correction from being applied to unrealistic
+                hypothetical structures containing large proportions of very electronegative
+                elements, thus artificially over-stabilizing the compound. Set to "no_check"
+                to restore the original behavior described in the associated publication. Default: True
             check_potcar (bool): Check that the POTCARs used in the calculation are consistent
                 with the Materials Project parameters. False bypasses this check altogether. Default: True
                 Can also be disabled globally by running `pmg config --add PMG_POTCAR_CHECKS false`.
@@ -893,6 +923,7 @@ class MaterialsProject2020Compatibility(Compatibility):
 
         self.compat_type = compat_type
         self.correct_peroxide = correct_peroxide
+        self.strict_anions = strict_anions
         self.check_potcar = check_potcar
         self.check_potcar_hash = check_potcar_hash
 
@@ -955,7 +986,7 @@ class MaterialsProject2020Compatibility(Compatibility):
         comp = entry.composition
         rform = comp.reduced_formula
         # sorted list of elements, ordered by electronegativity
-        elements = sorted((el for el in comp.elements if comp[el] > 0), key=lambda el: el.X)
+        sorted_elements = sorted((el for el in comp.elements if comp[el] > 0), key=lambda el: el.X)
 
         # Skip single elements
         if len(comp) == 1:
@@ -995,7 +1026,7 @@ class MaterialsProject2020Compatibility(Compatibility):
                 else:
                     warnings.warn(
                         "No structure or oxide_type parameter present. Note that peroxide/superoxide corrections "
-                        "are not as reliable and relies only on detection of special formulas, e.g., Li2O2."
+                        "are not as reliable and relies only on detection of special formulas, e.g. Li2O2."
                     )
 
                     common_peroxides = "Li2O2 Na2O2 K2O2 Cs2O2 Rb2O2 BeO2 MgO2 CaO2 SrO2 BaO2".split()
@@ -1048,16 +1079,33 @@ class MaterialsProject2020Compatibility(Compatibility):
                 "only the most electronegative atom."
             )
 
-        for anion in "Br I Se Si Sb Te H N F Cl".split():
+        for anion in ("Br", "I", "Se", "Si", "Sb", "Te", "H", "N", "F", "Cl"):
             if Element(anion) in comp and anion in self.comp_correction:
                 apply_correction = False
+                oxidation_state = entry.data["oxidation_states"].get(anion, 0)
                 # if the oxidation_states key is not populated, only apply the correction if the anion
                 # is the most electronegative element
-                if entry.data["oxidation_states"].get(anion, 0) < 0:
+                if oxidation_state < 0:
                     apply_correction = True
+                    if self.strict_anions == "require_bound" and oxidation_state > -1:
+                        # This is not an anion. Noting that the rare case of a fractional
+                        # oxidation state in range [-1, 0] might be considered an anionic.
+                        # This could include suboxides or metal-rich pnictides, chalcogenides etc.
+                        # However! these cases are not included in the experimental fitting data
+                        # used for the correction scheme, and so there is no information for
+                        # whether the corrections are appropriate in this instance, and likely
+                        # may.
+                        apply_correction = False
                 else:
-                    most_electroneg = elements[-1].symbol
+                    most_electroneg = sorted_elements[-1].symbol
                     if anion == most_electroneg:
+                        apply_correction = True
+
+                if self.strict_anions == "require_exact":
+                    apply_correction = False
+                    if (oxi_range := MP2020_ANION_OXIDATION_STATE_RANGES.get(anion)) and (
+                        oxi_range[0] <= oxidation_state <= oxi_range[1]
+                    ):
                         apply_correction = True
 
                 if apply_correction:
@@ -1074,7 +1122,7 @@ class MaterialsProject2020Compatibility(Compatibility):
         # GGA / GGA+U mixing scheme corrections
         calc_u = entry.parameters.get("hubbards")
         calc_u = defaultdict(int) if calc_u is None else calc_u
-        most_electroneg = elements[-1].symbol
+        most_electroneg = sorted_elements[-1].symbol
         u_corrections = self.u_corrections.get(most_electroneg, defaultdict(float))
         u_settings = self.u_settings.get(most_electroneg, defaultdict(float))
         u_errors = self.u_errors.get(most_electroneg, defaultdict(float))
@@ -1277,7 +1325,7 @@ class MaterialsProjectAqueousCompatibility(Compatibility):
         super().__init__()
 
     def get_adjustments(self, entry: ComputedEntry) -> list[EnergyAdjustment]:
-        """Returns the corrections applied to a particular entry.
+        """Get the corrections applied to a particular entry.
 
         Args:
             entry: A ComputedEntry object.
@@ -1354,7 +1402,7 @@ class MaterialsProjectAqueousCompatibility(Compatibility):
         # TODO - detection of embedded water molecules is not very sophisticated
         # Should be replaced with some kind of actual structure detection
 
-        # For any compound except water, check to see if it is a hydrate (contains
+        # For any compound except water, check if it is a hydrate (contains
         # H2O in its structure). If so, adjust the energy to remove MU_H2O eV per
         # embedded water molecule.
         # in other words, we assume that the DFT energy of such a compound is really

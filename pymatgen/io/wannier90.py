@@ -64,8 +64,7 @@ class Unk:
 
     @data.setter
     def data(self, value: np.ndarray) -> None:
-        """
-        Sets the value of data.
+        """Set the value of data.
 
         Args:
             value (np.ndarray): data to replace stored data, must have shape
@@ -128,8 +127,7 @@ class Unk:
         return cls(ik, data)
 
     def write_file(self, filename: str) -> None:
-        """
-        Write the UNK file.
+        """Write the UNK file.
 
         Args:
             filename (str): path to UNK file to write, the name should have the

@@ -29,11 +29,10 @@ import itertools
 import os
 import re
 import textwrap
-import typing
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING
 
 from monty.dev import deprecated
 from monty.io import zopen
@@ -46,10 +45,14 @@ from pymatgen.io.vasp.inputs import KpointsSupportedModes
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Any, Literal
+
     from typing_extensions import Self
 
     from pymatgen.core.lattice import Lattice
     from pymatgen.core.structure import Molecule, Structure
+    from pymatgen.util.typing import Kpoint, Tuple3Ints
 
 __author__ = "Nicholas Winner"
 __version__ = "2.0"
@@ -60,8 +63,7 @@ MODULE_DIR = Path(__file__).resolve().parent
 
 
 class Keyword(MSONable):
-    """
-    Class representing a keyword argument in CP2K. Within CP2K Sections, which activate features
+    """A keyword argument in CP2K. Within CP2K Sections, which activate features
     of the CP2K code, the keywords are arguments that control the functionality of that feature.
     For example, the section "FORCE_EVAL" activates the evaluation of forces/energies, but within
     "FORCE_EVAL" the keyword "METHOD" controls whether or not this will be done with, say,
@@ -77,8 +79,7 @@ class Keyword(MSONable):
         verbose: bool | None = True,
         repeats: bool | None = False,
     ):
-        """
-        Initializes a keyword. These Keywords and the value passed to them are sometimes as simple
+        """Initialize a keyword. These Keywords and the value passed to them are sometimes as simple
         as KEYWORD VALUE, but can also be more elaborate such as KEYWORD [UNITS] VALUE1 VALUE2,
         which is why this class exists: to handle many values and control easy printing to an
         input file.
@@ -191,8 +192,7 @@ class KeywordList(MSONable):
     """
 
     def __init__(self, keywords: Sequence[Keyword]):
-        """
-        Initializes a keyword list given a sequence of keywords.
+        """Initialize a keyword list given a sequence of keywords.
 
         Args:
             keywords: A list of keywords. Must all have the same name (case-insensitive)
@@ -313,12 +313,6 @@ class Section(MSONable):
         s2.silence()
         return d2.as_dict() == s2.as_dict()
 
-    def __deepcopy__(self, memodict=None):
-        c = copy.deepcopy(self.as_dict())
-        return getattr(__import__(c["@module"], globals(), locals(), c["@class"], 0), c["@class"]).from_dict(
-            copy.deepcopy(self.as_dict())
-        )
-
     def __getitem__(self, d):
         if r := self.get_keyword(d) or self.get_section(d):
             return r
@@ -386,8 +380,7 @@ class Section(MSONable):
         return self + other
 
     def get(self, d, default=None):
-        """
-        Similar to get for dictionaries. This will attempt to retrieve the
+        """Similar to get for dictionaries. This will attempt to retrieve the
         section or keyword matching d. Will not raise an error if d does not exist.
 
         Args:
@@ -402,8 +395,7 @@ class Section(MSONable):
         return default
 
     def get_section(self, d, default=None):
-        """
-        Get function, only for subsections.
+        """Get function, only for subsections.
 
         Args:
             d: Name of section to get
@@ -415,8 +407,7 @@ class Section(MSONable):
         return default
 
     def get_keyword(self, d, default=None):
-        """
-        Get function, only for subsections.
+        """Get function, only for subsections.
 
         Args:
             d: Name of keyword to get
@@ -564,7 +555,7 @@ class Section(MSONable):
                 width=50,
             )
             string += f"\n{filled}\n"
-        string += "\t" * indent + "&" + d.name
+        string += "\t" * indent + f"&{d.name}"
         string += f" {' '.join(map(str, d.section_parameters))}\n"
 
         for v in d.keywords.values():
@@ -603,8 +594,7 @@ class SectionList(MSONable):
     """Section list."""
 
     def __init__(self, sections: Sequence[Section]):
-        """
-        Initializes a SectionList object using a sequence of sections.
+        """Initialize a SectionList object using a sequence of sections.
 
         Args:
             sections: A list of keywords. Must all have the same name (case-insensitive)
@@ -632,9 +622,6 @@ class SectionList(MSONable):
     def __getitem__(self, item):
         return self.sections[item]
 
-    def __deepcopy__(self, memodict=None):
-        return SectionList(sections=[d.__deepcopy__() for d in self.sections])
-
     @staticmethod
     def _get_str(d, indent=0):
         return " \n".join(s._get_str(s, indent) for s in d)
@@ -644,8 +631,7 @@ class SectionList(MSONable):
         return SectionList._get_str(self.sections)
 
     def get(self, d, index=-1):
-        """
-        Get for section list. If index is specified, return the section at that index.
+        """Get for section list. If index is specified, return the section at that index.
         Otherwise, return a get on the last section.
         """
         return self.sections[index].get(d)
@@ -695,17 +681,14 @@ class Cp2kInput(Section):
         return string
 
     @classmethod
-    def _from_dict(cls, dct):
+    def _from_dict(cls, dct: dict):
         """Initialize from a dictionary."""
-        return Cp2kInput(
-            "CP2K_INPUT",
-            subsections=getattr(
-                __import__(dct["@module"], globals(), locals(), dct["@class"], 0),
-                dct["@class"],
-            )
-            .from_dict(dct)
-            .subsections,
+        constructor = getattr(
+            __import__(dct["@module"], globals(), locals(), dct["@class"], 0),
+            dct["@class"],
         )
+
+        return Cp2kInput("CP2K_INPUT", subsections=constructor.from_dict(dct).subsections)
 
     @classmethod
     def from_file(cls, filename: str | Path) -> Self:
@@ -1296,7 +1279,7 @@ class OrbitalTransformation(Section):
 
 
 class Cell(Section):
-    """Defines the simulation cell (lattice)."""
+    """Controls the cell/lattice parameters for the simulation."""
 
     def __init__(self, lattice: Lattice, keywords: dict | None = None, **kwargs):
         """
@@ -1320,7 +1303,7 @@ class Cell(Section):
 
 
 class Kind(Section):
-    """Specifies the information for the different atom types being simulated."""
+    """Specify the information for the different atom types being simulated."""
 
     def __init__(
         self,
@@ -1460,7 +1443,7 @@ class DftPlusU(Section):
 
 
 class Coord(Section):
-    """Specifies the coordinates of the atoms using a pymatgen structure object."""
+    """Specify the coordinates of the atoms using a pymatgen structure object."""
 
     def __init__(
         self,
@@ -1607,7 +1590,7 @@ class VHartreeCube(Section):
         )
 
 
-@deprecated(VHartreeCube, "Deprecated on 2024-03-29, to be removed on 2025-03-29.")
+@deprecated(VHartreeCube, "Deprecated on 2024-03-29.", deadline=(2025, 3, 29))
 class V_Hartree_Cube(VHartreeCube):
     pass
 
@@ -1651,7 +1634,7 @@ class MOCubes(Section):
         )
 
 
-@deprecated(MOCubes, "Deprecated on 2024-03-29, to be removed on 2025-03-29.")
+@deprecated(MOCubes, "Deprecated on 2024-03-29.", deadline=(2025, 3, 29))
 class MO_Cubes(MOCubes):
     pass
 
@@ -1676,7 +1659,7 @@ class EDensityCube(Section):
         )
 
 
-@deprecated(EDensityCube, "Deprecated on 2024-03-29, to be removed on 2025-03-29.")
+@deprecated(EDensityCube, "Deprecated on 2024-03-29.", deadline=(2025, 3, 29))
 class E_Density_Cube(EDensityCube):
     pass
 
@@ -1803,7 +1786,7 @@ class BrokenSymmetry(Section):
         nel_beta = []
         n_alpha = []
         n_beta = []
-        unpaired_orbital: tuple[int, int, int] = (0, 0, 0)
+        unpaired_orbital: Tuple3Ints = (0, 0, 0)
         while tmp:
             tmp2 = -min((esv[0][2], tmp)) if tmp > 0 else min((f2(esv[0][1]) - esv[0][2], -tmp))
             l_alpha.append(esv[0][1])
@@ -1848,7 +1831,7 @@ class BrokenSymmetry(Section):
 
 
 class XCFunctional(Section):
-    """Defines the XC functional(s) to use."""
+    """Info about which XC functional to use."""
 
     def __init__(
         self,
@@ -1875,7 +1858,7 @@ class XCFunctional(Section):
         )
 
 
-@deprecated(XCFunctional, "Deprecated on 2024-03-29, to be removed on 2025-03-29.")
+@deprecated(XCFunctional, "Deprecated on 2024-03-29.", deadline=(2025, 3, 29))
 class Xc_Functional(XCFunctional):
     pass
 
@@ -2031,42 +2014,49 @@ class Kpoints(Section):
         weights = kpoints.kpts_weights
 
         if kpoints.style == KpointsSupportedModes.Monkhorst:
-            k = kpts[0]
-            x, y, z = (k, k, k) if isinstance(k, (int, float)) else k
+            kpt: Kpoint = kpts[0]  # type: ignore[assignment]
+            x, y, z = (kpt, kpt, kpt) if isinstance(kpt, (int, float)) else kpt  # type: ignore[misc]
             scheme = f"MONKHORST-PACK {x} {y} {z}"
             units = "B_VECTOR"
+
         elif kpoints.style == KpointsSupportedModes.Reciprocal:
             units = "B_VECTOR"
             scheme = "GENERAL"
+
         elif kpoints.style == KpointsSupportedModes.Cartesian:
             units = "CART_ANGSTROM"
             scheme = "GENERAL"
+
         elif kpoints.style == KpointsSupportedModes.Gamma:
+            if not structure:
+                raise ValueError(
+                    "No cp2k automatic gamma constructor. A structure is required to construct from spglib"
+                )
+
             if (isinstance(kpts[0], Iterable) and tuple(kpts[0]) == (1, 1, 1)) or (
                 isinstance(kpts[0], (float, int)) and int(kpts[0]) == 1
             ):
                 scheme = "GAMMA"
-                units = "B_VECTOR"
-            elif not structure:
-                raise ValueError(
-                    "No cp2k automatic gamma constructor. A structure is required to construct from spglib"
-                )
             else:
                 sga = SpacegroupAnalyzer(structure)
-                _kpts, weights = zip(*sga.get_ir_reciprocal_mesh(mesh=kpts))
-                kpts = list(itertools.chain.from_iterable(_kpts))
+                _kpts, weights = zip(*sga.get_ir_reciprocal_mesh(mesh=kpts))  # type: ignore[assignment]
+                kpts = tuple(itertools.chain.from_iterable(_kpts))
                 scheme = "GENERAL"
-                units = "B_VECTOR"
+
+            units = "B_VECTOR"
+
         elif kpoints.style == KpointsSupportedModes.Line_mode:
             scheme = "GENERAL"
             units = "B_VECTOR"
+
         else:
             raise ValueError("Unrecognized k-point style")
+
         return Kpoints(kpts=kpts, weights=weights, scheme=scheme, units=units)
 
 
 class KpointSet(Section):
-    """Specifies a kpoint line to be calculated between special points."""
+    """Specify a kpoint line to be calculated between special points."""
 
     def __init__(self, npoints: int, kpoints: Iterable, units: str = "B_VECTOR") -> None:
         """
@@ -2099,13 +2089,13 @@ class KpointSet(Section):
         )
 
 
-@deprecated(KpointSet, "Kpoint_Set has been deprecated in favor of KpointSet on 2024-03-16")
+@deprecated(KpointSet, "Kpoint_Set has been deprecated on 2024-03-16", deadline=(2025, 3, 16))
 class Kpoint_Set(KpointSet):
     pass
 
 
 class BandStructure(Section):
-    """Specifies high symmetry paths for outputting the band structure in CP2K."""
+    """Specify high symmetry paths for outputting the band structure in CP2K."""
 
     def __init__(
         self,
@@ -2183,7 +2173,7 @@ class BandStructure(Section):
         return cls(kpoint_sets=kpoint_sets, filename="BAND.bs")
 
 
-@deprecated(BandStructure, "Deprecated on 2024-03-29, to be removed on 2025-03-29.")
+@deprecated(BandStructure, "Deprecated on 2024-03-29.", deadline=(2025, 3, 29))
 class Band_Structure(BandStructure):
     pass
 
@@ -2225,8 +2215,7 @@ class BasisInfo(MSONable):
     xc: str | None = None
 
     def softmatch(self, other):
-        """
-        Soft matching to see if two basis sets match.
+        """Soft matching to see if two basis sets match.
 
         Will only match those attributes which *are* defined for this basis info object (one way checking)
         """
@@ -2313,8 +2302,7 @@ class AtomicMetadata(MSONable):
     version: str | None = None
 
     def softmatch(self, other):
-        """
-        Soft matching to see if a desired basis/potential matches requirements.
+        """Soft matching to see if a desired basis/potential matches requirements.
 
         Does soft matching on the "info" attribute first. Then soft matches against the
         element and name/aliases.
@@ -2407,7 +2395,6 @@ class GaussianTypeOrbitalBasisSet(AtomicMetadata):
         """Number of exponents."""
         return [len(exp) for exp in self.exponents]
 
-    @typing.no_type_check
     def get_str(self) -> str:
         """Get standard cp2k GTO formatted string."""
         if (  # written verbosely so mypy can perform type narrowing
@@ -2526,8 +2513,7 @@ class PotentialInfo(MSONable):
     xc: str | None = None
 
     def softmatch(self, other):
-        """
-        Soft matching to see if two potentials match.
+        """Soft matching to see if two potentials match.
 
         Will only match those attributes which *are* defined for this basis info object (one way checking)
         """

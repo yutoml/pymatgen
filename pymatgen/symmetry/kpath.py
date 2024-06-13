@@ -1,11 +1,11 @@
-"""Provides classes for generating high-symmetry k-paths using different conventions."""
+"""Classes for generating high-symmetry k-paths using different conventions."""
 
 from __future__ import annotations
 
 import abc
 import itertools
 from math import ceil, cos, e, pi, sin, tan
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from warnings import warn
 
 import networkx as nx
@@ -23,6 +23,8 @@ except ImportError:
     get_path = None
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from pymatgen.core import Structure
     from pymatgen.util.typing import SpeciesLike
 
@@ -63,55 +65,39 @@ class KPathBase(abc.ABC):
 
     @property
     def structure(self):
-        """
-        Returns:
-            The input structure.
-        """
+        """The input structure."""
         return self._structure
 
     @property
     def lattice(self):
-        """
-        Returns:
-            The real space lattice.
-        """
+        """The real space lattice."""
         return self._latt
 
     @property
     def rec_lattice(self):
-        """
-        Returns:
-            The reciprocal space lattice.
-        """
+        """The reciprocal space lattice."""
         return self._rec_lattice
 
     @property
     def kpath(self):
-        """
-        Returns:
-            The symmetry line path in reciprocal space.
-        """
+        """The symmetry line path in reciprocal space."""
         return self._kpath
 
     def get_kpoints(self, line_density=20, coords_are_cartesian=True):
-        """
-        Returns:
-            kpoints along the path in Cartesian coordinates
-        together with the critical-point labels.
-        """
+        """Get kpoints along the path in Cartesian coordinates together with the critical-point labels."""
         list_k_points = []
         sym_point_labels = []
-        for b in self.kpath["path"]:
-            for i in range(1, len(b)):
-                start = np.array(self.kpath["kpoints"][b[i - 1]])
-                end = np.array(self.kpath["kpoints"][b[i]])
+        for k_path in self.kpath["path"]:
+            for path_step in range(1, len(k_path)):
+                start = np.array(self.kpath["kpoints"][k_path[path_step - 1]])
+                end = np.array(self.kpath["kpoints"][k_path[path_step]])
                 distance = np.linalg.norm(
                     self._rec_lattice.get_cartesian_coords(start) - self._rec_lattice.get_cartesian_coords(end)
                 )
-                nb = int(ceil(distance * line_density))
+                nb = ceil(distance * line_density)
                 if nb == 0:
                     continue
-                sym_point_labels.extend([b[i - 1]] + [""] * (nb - 1) + [b[i]])
+                sym_point_labels.extend([k_path[path_step - 1]] + [""] * (nb - 1) + [k_path[path_step]])
                 list_k_points += [
                     self._rec_lattice.get_cartesian_coords(start)
                     + float(i)
@@ -278,26 +264,17 @@ class KPathSetyawanCurtarolo(KPathBase):
 
     @property
     def conventional(self):
-        """
-        Returns:
-            The conventional cell structure.
-        """
+        """The conventional cell structure."""
         return self._conv
 
     @property
     def prim(self):
-        """
-        Returns:
-            The primitive cell structure.
-        """
+        """The primitive cell structure."""
         return self._prim
 
     @property
     def prim_rec(self):
-        """
-        Returns:
-            The primitive reciprocal cell structure.
-        """
+        """The primitive reciprocal cell structure."""
         return self._rec_lattice
 
     def cubic(self):
@@ -1051,7 +1028,7 @@ class KPathLatimerMunro(KPathBase):
         """
         super().__init__(structure, symprec=symprec, angle_tolerance=angle_tolerance, atol=atol)
 
-        # Check to see if input cell is reducible. Ref: B Gruber in Acta. Cryst. Vol. A29,
+        # Check if input cell is reducible. Ref: B Gruber in Acta. Cryst. Vol. A29,
         # pp. 433-440 ('The Relationship between Reduced Cells in a General Bravais lattice').
         # The correct BZ will still be obtained if the lattice vectors are reducible by any
         # linear combination of themselves with coefficients of absolute value less than 2,
@@ -1089,11 +1066,9 @@ class KPathLatimerMunro(KPathBase):
 
     @property
     def mag_type(self):
-        """
-        Returns:
-            The type of magnetic space group as a string. Current implementation does not
-            distinguish between types 3 and 4, so return value is '3/4'. If has_magmoms is
-            False, returns '0'.
+        """The type of magnetic space group as a string. Current implementation does not
+        distinguish between types 3 and 4, so return value is '3/4'. If has_magmoms is
+        False, returns '0'.
         """
         return self._mag_type
 

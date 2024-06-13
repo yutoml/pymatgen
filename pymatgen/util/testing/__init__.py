@@ -1,8 +1,8 @@
-"""Common test support for pymatgen test scripts.
+"""This module implements testing utilities for materials science codes.
 
-This single module should provide all the common functionality for pymatgen
-tests in a single location, so that test scripts can just import it and work
-right away.
+While the primary use is within pymatgen, the functionality is meant to be useful for external materials science
+codes as well. For instance, obtaining example crystal structures to perform tests, specialized assert methods for
+materials science, etc.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import json
 import pickle  # use pickle, not cPickle so that we get the traceback in case of errors
 import string
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING
 from unittest import TestCase
 
 import pytest
@@ -22,12 +22,13 @@ from pymatgen.core import ROOT, SETTINGS, Structure
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Any, ClassVar
 
 MODULE_DIR = Path(__file__).absolute().parent
 STRUCTURES_DIR = MODULE_DIR / ".." / "structures"
 TEST_FILES_DIR = Path(SETTINGS.get("PMG_TEST_FILES_DIR", f"{ROOT}/tests/files"))
-VASP_IN_DIR = f"{TEST_FILES_DIR}/vasp/inputs"
-VASP_OUT_DIR = f"{TEST_FILES_DIR}/vasp/outputs"
+VASP_IN_DIR = f"{TEST_FILES_DIR}/io/vasp/inputs"
+VASP_OUT_DIR = f"{TEST_FILES_DIR}/io/vasp/outputs"
 # fake POTCARs have original header information, meaning properties like number of electrons,
 # nuclear charge, core radii, etc. are unchanged (important for testing) while values of the and
 # pseudopotential kinetic energy corrections are scrambled to avoid VASP copyright infringement
@@ -63,7 +64,7 @@ class PymatgenTest(TestCase):
 
     @staticmethod
     def assert_str_content_equal(actual, expected):
-        """Tests if two strings are equal, ignoring things like trailing spaces, etc."""
+        """Test if two strings are equal, ignoring things like trailing spaces, etc."""
         strip_whitespace = {ord(c): None for c in string.whitespace}
         return actual.translate(strip_whitespace) == expected.translate(strip_whitespace)
 

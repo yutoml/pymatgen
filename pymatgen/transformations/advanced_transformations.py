@@ -9,7 +9,7 @@ from fractions import Fraction
 from itertools import groupby, product
 from math import gcd
 from string import ascii_lowercase
-from typing import TYPE_CHECKING, Callable, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -47,7 +47,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
-    from typing import Any
+    from typing import Any, Callable, Literal
 
 
 __author__ = "Shyue Ping Ong, Stephen Dacek, Anubhav Jain, Matthew Horton, Alex Ganose"
@@ -69,7 +69,7 @@ class ChargeBalanceTransformation(AbstractTransformation):
         self.charge_balance_sp = str(charge_balance_sp)
 
     def apply_transformation(self, structure: Structure):
-        """Applies the transformation.
+        """Apply the transformation.
 
         Args:
             structure: Input Structure
@@ -89,16 +89,6 @@ class ChargeBalanceTransformation(AbstractTransformation):
 
     def __repr__(self):
         return f"Charge Balance Transformation : Species to remove = {self.charge_balance_sp}"
-
-    @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
-    def is_one_to_many(self) -> bool:
-        """Returns: False."""
-        return False
 
 
 class SuperTransformation(AbstractTransformation):
@@ -122,7 +112,7 @@ class SuperTransformation(AbstractTransformation):
         self.nstructures_per_trans = nstructures_per_trans
 
     def apply_transformation(self, structure: Structure, return_ranked_list: bool | int = False):
-        """Applies the transformation.
+        """Apply the transformation.
 
         Args:
             structure: Input Structure
@@ -149,18 +139,13 @@ class SuperTransformation(AbstractTransformation):
         return f"Super Transformation : Transformations = {' '.join(map(str, self._transformations))}"
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
 class MultipleSubstitutionTransformation:
-    """Performs multiple substitutions on a structure. For example, can do a
+    """Perform multiple substitutions on a structure. For example, can do a
     fractional replacement of Ge in LiGePS with a list of species, creating one
     structure for each substitution. Ordering is done using a dummy element so
     only one ordering must be done per substitution oxidation state. Charge
@@ -179,7 +164,7 @@ class MultipleSubstitutionTransformation:
         charge_balance_species=None,
         order=True,
     ):
-        """Performs multiple fractional substitutions on a transmuter.
+        """Perform multiple fractional substitutions on a transmuter.
 
         Args:
             sp_to_replace: species to be replaced
@@ -203,7 +188,7 @@ class MultipleSubstitutionTransformation:
         self.order = order
 
     def apply_transformation(self, structure: Structure, return_ranked_list: bool | int = False):
-        """Applies the transformation.
+        """Apply the transformation.
 
         Args:
             structure: Input Structure
@@ -249,13 +234,8 @@ class MultipleSubstitutionTransformation:
         return f"Multiple Substitution Transformation : Substitution on {self.sp_to_replace}"
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
@@ -342,7 +322,7 @@ class EnumerateStructureTransformation(AbstractTransformation):
     def apply_transformation(
         self, structure: Structure, return_ranked_list: bool | int = False
     ) -> Structure | list[dict]:
-        """Returns either a single ordered structure or a sequence of all ordered
+        """Get either a single ordered structure or a sequence of all ordered
         structures.
 
         Args:
@@ -463,23 +443,19 @@ class EnumerateStructureTransformation(AbstractTransformation):
                 else:
                     raise ValueError("Unsupported sort criteria.")
 
-                return {
-                    "num_sites": len(struct),
-                    "energy": energy,
-                    "structure": struct,
-                }
+                return {"num_sites": len(struct), "energy": energy, "structure": struct}
 
             return {"num_sites": len(struct), "structure": struct}
 
         all_structures = Parallel(n_jobs=self.n_jobs)(delayed(_get_stats)(struct) for struct in structures)
 
-        def sort_func(s):
+        def sort_func(struct):
             return (
-                s["energy"] / s["num_sites"]
+                struct["energy"] / struct["num_sites"]
                 if callable(self.sort_criteria)
                 or self.sort_criteria.startswith("m3gnet")
                 or (contains_oxidation_state and self.sort_criteria == "ewald")
-                else s["num_sites"]
+                else struct["num_sites"]
             )
 
         self._all_structures = sorted(all_structures, key=sort_func)
@@ -492,13 +468,8 @@ class EnumerateStructureTransformation(AbstractTransformation):
         return "EnumerateStructureTransformation"
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
@@ -520,7 +491,7 @@ class SubstitutionPredictorTransformation(AbstractTransformation):
         self._substitutor = SubstitutionPredictor(threshold=threshold, **kwargs)
 
     def apply_transformation(self, structure: Structure, return_ranked_list: bool | int = False):
-        """Applies the transformation.
+        """Apply the transformation.
 
         Args:
             structure: Input Structure
@@ -557,13 +528,8 @@ class SubstitutionPredictorTransformation(AbstractTransformation):
         return "SubstitutionPredictorTransformation"
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
@@ -619,7 +585,7 @@ class MagOrderParameterConstraint(MSONable):
         self.site_constraints = site_constraints
 
     def satisfies_constraint(self, site):
-        """Checks if a periodic site satisfies the constraint."""
+        """Check if a periodic site satisfies the constraint."""
         if not site.is_ordered:
             return False
 
@@ -895,8 +861,8 @@ class MagOrderingTransformation(AbstractTransformation):
             alls = self._add_spin_magnitudes(alls)  # type: ignore[arg-type]
         else:
             for idx in range(len(alls)):
-                alls[idx]["structure"] = self._remove_dummy_species(alls[idx]["structure"])
-                alls[idx]["structure"] = self._add_spin_magnitudes(alls[idx]["structure"])
+                alls[idx]["structure"] = self._remove_dummy_species(alls[idx]["structure"])  # type: ignore[index]
+                alls[idx]["structure"] = self._add_spin_magnitudes(alls[idx]["structure"])  # type: ignore[index, arg-type]
 
         try:
             num_to_return = int(return_ranked_list)
@@ -904,7 +870,7 @@ class MagOrderingTransformation(AbstractTransformation):
             num_to_return = 1
 
         if num_to_return == 1 or not return_ranked_list:
-            return alls[0]["structure"] if num_to_return else alls  # type: ignore[return-value]
+            return alls[0]["structure"] if num_to_return else alls  # type: ignore[return-value, index]
 
         # remove duplicate structures and group according to energy model
         matcher = StructureMatcher(comparator=SpinComparator())
@@ -913,7 +879,7 @@ class MagOrderingTransformation(AbstractTransformation):
             return SpacegroupAnalyzer(struct, 0.1).get_space_group_number()
 
         out = []
-        for _, group in groupby(sorted((dct["structure"] for dct in alls), key=key), key):
+        for _, group in groupby(sorted((dct["structure"] for dct in alls), key=key), key):  # type: ignore[arg-type, index]
             group = list(group)  # type: ignore
             grouped = matcher.group_structures(group)
             out.extend([{"structure": g[0], "energy": self.energy_model.get_energy(g[0])} for g in grouped])
@@ -922,25 +888,14 @@ class MagOrderingTransformation(AbstractTransformation):
 
         return self._all_structures[0:num_to_return]  # type: ignore
 
-    def __str__(self) -> str:
-        return "MagOrderingTransformation"
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    @property
-    def inverse(self) -> None:
-        """Returns: None."""
-        return
-
     @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
 def find_codopant(target: Species, oxidation_state: float, allowed_elements: Sequence[str] | None = None) -> Species:
-    """Finds the element from "allowed elements" that (i) possesses the desired
+    """Find the element from "allowed elements" that (i) possesses the desired
     "oxidation state" and (ii) is closest in ionic radius to the target specie.
 
     Args:
@@ -986,14 +941,14 @@ class DopingTransformation(AbstractTransformation):
     ):
         """
         Args:
-            dopant (Species-like): E.g., Al3+. Must have oxidation state.
-            ionic_radius_tol (float): E.g., Fractional allowable ionic radii
+            dopant (Species-like): e.g. Al3+. Must have oxidation state.
+            ionic_radius_tol (float): e.g. Fractional allowable ionic radii
                 mismatch for dopant to fit into a site. Default of inf means
                 that any dopant with the right oxidation state is allowed.
             min_length (float): Min. lattice parameter between periodic
                 images of dopant. Defaults to 10A for now.
             alio_tol (int): If this is not 0, attempt will be made to dope
-                sites with oxidation_states +- alio_tol of the dopant. E.g.,
+                sites with oxidation_states +- alio_tol of the dopant. e.g.
                 1 means that the ions like Ca2+ and Ti4+ are considered as
                 potential doping sites for Al3+.
             codopant (bool): If True, doping will be carried out with a
@@ -1154,13 +1109,8 @@ class DopingTransformation(AbstractTransformation):
         return all_structures[0]["structure"]
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
@@ -1214,7 +1164,7 @@ class SlabTransformation(AbstractTransformation):
         self.tol = tol
 
     def apply_transformation(self, structure: Structure):
-        """Applies the transformation.
+        """Apply the transformation.
 
         Args:
             structure: Input Structure
@@ -1234,16 +1184,6 @@ class SlabTransformation(AbstractTransformation):
             self.max_normal_search,
         )
         return sg.get_slab(self.shift, self.tol)
-
-    @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
-    def is_one_to_many(self) -> bool:
-        """Returns: False."""
-        return False
 
 
 class DisorderOrderedTransformation(AbstractTransformation):
@@ -1297,13 +1237,8 @@ class DisorderOrderedTransformation(AbstractTransformation):
         return disordered_structures
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
     @staticmethod
@@ -1378,7 +1313,7 @@ class GrainBoundaryTransformation(AbstractTransformation):
         rotation_angle,
         expand_times=4,
         vacuum_thickness=0.0,
-        ab_shift=None,
+        ab_shift: tuple[float, float] | None = None,
         normal=False,
         ratio=True,
         plane=None,
@@ -1404,7 +1339,7 @@ class GrainBoundaryTransformation(AbstractTransformation):
                 cell do not interact with each other. Default set to 4.
             vacuum_thickness (float): The thickness of vacuum that you want to insert between
                 two grains of the GB. Default to 0.
-            ab_shift (list of float, in unit of a, b vectors of Gb): in plane shift of two grains
+            ab_shift (tuple[float, float]): in plane shift of two grains in unit of a, b vectors of Gb
             normal (logic):
                 determine if need to require the c axis of top grain (first transformation matrix)
                 perpendicular to the surface or not.
@@ -1447,7 +1382,7 @@ class GrainBoundaryTransformation(AbstractTransformation):
         self.rotation_angle = rotation_angle
         self.expand_times = expand_times
         self.vacuum_thickness = vacuum_thickness
-        self.ab_shift = ab_shift or [0, 0]
+        self.ab_shift = ab_shift or (0, 0)
         self.normal = normal
         self.ratio = ratio
         self.plane = plane
@@ -1457,7 +1392,7 @@ class GrainBoundaryTransformation(AbstractTransformation):
         self.quick_gen = quick_gen
 
     def apply_transformation(self, structure: Structure):
-        """Applies the transformation.
+        """Apply the transformation.
 
         Args:
             structure: Input Structure
@@ -1468,6 +1403,7 @@ class GrainBoundaryTransformation(AbstractTransformation):
             Grain boundary Structures.
         """
         gbg = GrainBoundaryGenerator(structure)
+
         return gbg.gb_from_parameters(
             self.rotation_axis,
             self.rotation_angle,
@@ -1482,16 +1418,6 @@ class GrainBoundaryTransformation(AbstractTransformation):
             rm_ratio=self.rm_ratio,
             quick_gen=self.quick_gen,
         )
-
-    @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
-    def is_one_to_many(self) -> bool:
-        """Returns: False."""
-        return False
 
 
 class CubicSupercellTransformation(AbstractTransformation):
@@ -1624,16 +1550,6 @@ class CubicSupercellTransformation(AbstractTransformation):
                 )
         raise AttributeError("Unable to find cubic supercell")
 
-    @property
-    def inverse(self):
-        """Returns None."""
-        return
-
-    @property
-    def is_one_to_many(self) -> bool:
-        """Returns False."""
-        return False
-
 
 class AddAdsorbateTransformation(AbstractTransformation):
     """Create adsorbate structures."""
@@ -1713,13 +1629,8 @@ class AddAdsorbateTransformation(AbstractTransformation):
         return [{"structure": structure} for structure in structures[:return_ranked_list]]
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
@@ -1749,7 +1660,7 @@ def _round_and_make_arr_singular(arr: np.ndarray) -> np.ndarray:
     """
 
     def round_away_from_zero(x):
-        """Returns 'x' rounded to the next integer away from 0.
+        """Get 'x' rounded to the next integer away from 0.
         If 'x' is zero, then returns zero.
         E.g. -1.2 rounds to -2.0. 1.2 rounds to 2.0.
         """
@@ -1872,18 +1783,13 @@ class SubstituteSurfaceSiteTransformation(AbstractTransformation):
         return [{"structure": structure} for structure in structures[:return_ranked_list]]
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
 def _proj(b, a):
-    """Returns vector projection (np.ndarray) of vector b (np.ndarray)
+    """Get vector projection (np.ndarray) of vector b (np.ndarray)
     onto vector a (np.ndarray).
     """
     return (b.T @ (a / np.linalg.norm(a))) * (a / np.linalg.norm(a))
@@ -1915,9 +1821,9 @@ class SQSTransformation(AbstractTransformation):
         """
         Args:
             scaling (int or list): Scaling factor to determine supercell. Two options are possible:
-                a. (preferred) Scales number of atoms, e.g., for a structure with 8 atoms,
+                a. (preferred) Scales number of atoms, e.g. for a structure with 8 atoms,
                     scaling=4 would lead to a 32 atom supercell
-                b. A sequence of three scaling factors, e.g., [2, 1, 1], which
+                b. A sequence of three scaling factors, e.g. [2, 1, 1], which
                     specifies that the supercell should have dimensions 2a x b x c
             cluster_size_and_shell (Optional[Dict[int, int]]): Dictionary of cluster interactions with entries in
                 the form number of atoms: nearest neighbor shell
@@ -1985,7 +1891,7 @@ class SQSTransformation(AbstractTransformation):
 
     @staticmethod
     def _get_disordered_substructure(struct_disordered):
-        """Converts disordered structure into a substructure consisting of only disordered sites.
+        """Convert disordered structure into a substructure consisting of only disordered sites.
 
         Args:
             struct_disordered: pymatgen disordered Structure object.
@@ -2023,7 +1929,7 @@ class SQSTransformation(AbstractTransformation):
         return clusters
 
     def apply_transformation(self, structure: Structure, return_ranked_list: bool | int = False):
-        """Applies SQS transformation.
+        """Apply SQS transformation.
 
         Args:
             structure (pymatgen Structure): pymatgen Structure with partial occupancies
@@ -2093,7 +1999,7 @@ class SQSTransformation(AbstractTransformation):
 
     @staticmethod
     def _get_unique_best_sqs_structs(sqs, best_only, return_ranked_list, remove_duplicate_structures, reduction_algo):
-        """Gets unique sqs structures with lowest objective function. Requires an mcsqs output that has been run
+        """Get unique sqs structures with lowest objective function. Requires an mcsqs output that has been run
             in parallel, otherwise returns Sqs.bestsqs.
 
         Args:
@@ -2155,13 +2061,8 @@ class SQSTransformation(AbstractTransformation):
         return to_return
 
     @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
     def is_one_to_many(self) -> bool:
-        """Returns: True."""
+        """Transform one structure to many."""
         return True
 
 
@@ -2233,13 +2134,3 @@ class MonteCarloRattleTransformation(AbstractTransformation):
 
     def __repr__(self):
         return f"{__name__} : rattle_std = {self.rattle_std}"
-
-    @property
-    def inverse(self):
-        """Returns: None."""
-        return
-
-    @property
-    def is_one_to_many(self) -> bool:
-        """Returns: False."""
-        return False

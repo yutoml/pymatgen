@@ -1,6 +1,5 @@
 """
-This module provides classes for representing species substitution
-probabilities.
+This module provides classes for representing species substitution probabilities.
 """
 
 from __future__ import annotations
@@ -51,11 +50,9 @@ class SubstitutionProbability:
     def __init__(self, lambda_table=None, alpha=-5):
         """
         Args:
-            lambda_table:
-                json table of the weight functions lambda if None,
+            lambda_table: JSON table of the weight functions lambda if None,
                 will use the default lambda.json table
-            alpha:
-                weight function for never observed substitutions.
+            alpha (float): weight function for never observed substitutions.
         """
         if lambda_table is not None:
             self._lambda_table = lambda_table
@@ -79,7 +76,7 @@ class SubstitutionProbability:
 
         # create Z and px
         self.Z = 0
-        self._px = defaultdict(float)
+        self._px: dict[Species, float] = defaultdict(float)
         for s1, s2 in itertools.product(self.species, repeat=2):
             value = math.exp(self.get_lambda(s1, s2))
             self._px[s1] += value / 2
@@ -95,8 +92,8 @@ class SubstitutionProbability:
         Returns:
             Lambda values
         """
-        k = frozenset([get_el_sp(s1), get_el_sp(s2)])
-        return self._l.get(k, self.alpha)
+        key = frozenset([get_el_sp(s1), get_el_sp(s2)])
+        return self._l.get(key, self.alpha)
 
     def get_px(self, sp):
         """
@@ -109,8 +106,7 @@ class SubstitutionProbability:
         return self._px[get_el_sp(sp)]
 
     def prob(self, s1, s2):
-        """
-        Gets the probability of 2 species substitution. Not used by the
+        """Get the probability of 2 species substitution. Not used by the
         structure predictor.
 
         Returns:
@@ -143,8 +139,7 @@ class SubstitutionProbability:
         return math.exp(self.get_lambda(s1, s2)) * self.Z / (self.get_px(s1) * self.get_px(s2))
 
     def cond_prob_list(self, l1, l2):
-        """
-        Find the probabilities of 2 lists. These should include ALL species.
+        """Find the probabilities of 2 lists. These should include ALL species.
         This is the probability conditional on l2.
 
         Args:
@@ -162,7 +157,7 @@ class SubstitutionProbability:
         return p
 
     def as_dict(self):
-        """Returns: MSONable dict."""
+        """Get MSONable dict."""
         return {
             "name": type(self).__name__,
             "version": __version__,
@@ -252,8 +247,7 @@ class SubstitutionPredictor:
         return output
 
     def composition_prediction(self, composition, to_this_composition=True):
-        """
-        Returns charged balanced substitutions from a starting or ending
+        """Get charged balanced substitutions from a starting or ending
         composition.
 
         Args:

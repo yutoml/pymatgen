@@ -26,13 +26,14 @@ except ImportError:
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import ClassVar
 
 module_dir = os.path.dirname(os.path.abspath(__file__))
 EL_COLORS = loadfn(f"{module_dir}/ElementColorSchemes.yaml")
 
 
 class StructureVis:
-    """Provides Structure object visualization using VTK."""
+    """Structure visualization using VTK."""
 
     @requires(vtk, "Visualization requires the installation of VTK with Python bindings.")
     def __init__(
@@ -90,7 +91,7 @@ class StructureVis:
         self.title = "Structure Visualizer"
         self.iren = vtk.vtkRenderWindowInteractor()
         self.iren.SetRenderWindow(self.ren_win)
-        self.mapper_map = {}
+        self.mapper_map: dict = {}
         self.structure = None
 
         if element_color_mapping:
@@ -128,8 +129,7 @@ class StructureVis:
         self.ren_win.Render()
 
     def write_image(self, filename="image.png", magnification=1, image_format="png"):
-        """
-        Save render window to an image.
+        """Save render window to an image.
 
         Arguments:
             filename: file to save to. Defaults to image.png.
@@ -174,7 +174,7 @@ class StructureVis:
 
         self.ren_win.Render()
 
-    def orthongonalize_structure(self):
+    def orthogonalize_structure(self):
         """Orthogonalize the structure."""
         if self.structure is not None:
             self.set_structure(self.structure.copy(sanitize=True))
@@ -673,13 +673,12 @@ class StructureVis:
         """
         points = vtk.vtkPoints()
         points.InsertPoint(0, center.x, center.y, center.z)
-        n = len(neighbors)
         lines = vtk.vtkCellArray()
-        for i in range(n):
-            points.InsertPoint(i + 1, neighbors[i].coords)
+        for idx, neighbor in enumerate(neighbors):
+            points.InsertPoint(idx + 1, neighbor.coords)
             lines.InsertNextCell(2)
             lines.InsertCellPoint(0)
-            lines.InsertCellPoint(i + 1)
+            lines.InsertCellPoint(idx + 1)
         pd = vtk.vtkPolyData()
         pd.SetPoints(points)
         pd.SetLines(lines)
@@ -881,7 +880,7 @@ def make_movie(structures, output_filename="movie.mp4", zoom=1.0, fps=20, bitrat
 class MultiStructuresVis(StructureVis):
     """Visualization for multiple structures."""
 
-    DEFAULT_ANIMATED_MOVIE_OPTIONS = dict(
+    DEFAULT_ANIMATED_MOVIE_OPTIONS: ClassVar[dict[str, str | float]] = dict(
         time_between_frames=0.1,
         looping_type="restart",
         number_of_loops=1,

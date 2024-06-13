@@ -16,7 +16,7 @@ __maintainer__ = "Matteo Giantomassi"
 
 
 class XSF:
-    """Class for parsing XCrysden files."""
+    """Parse XCrysden files."""
 
     def __init__(self, structure: Structure):
         """
@@ -26,8 +26,7 @@ class XSF:
         self.structure = structure
 
     def to_str(self, atom_symbol: bool = True) -> str:
-        """
-        Returns a string with the structure in XSF format
+        """Get a string with the structure in XSF format
         See http://www.xcrysden.org/doc/XSF.html.
 
         Args:
@@ -35,17 +34,13 @@ class XSF:
         """
         lines: list[str] = []
 
-        lines.append("CRYSTAL")
-        lines.append("# Primitive lattice vectors in Angstrom")
-        lines.append("PRIMVEC")
+        lines.extend(("CRYSTAL", "# Primitive lattice vectors in Angstrom", "PRIMVEC"))
         cell = self.structure.lattice.matrix
         for i in range(3):
             lines.append(f" {cell[i][0]:.14f} {cell[i][1]:.14f} {cell[i][2]:.14f}")
 
         cart_coords = self.structure.cart_coords
-        lines.append("# Cartesian coordinates in Angstrom.")
-        lines.append("PRIMCOORD")
-        lines.append(f" {len(cart_coords)} 1")
+        lines.extend(("# Cartesian coordinates in Angstrom.", "PRIMCOORD", f" {len(cart_coords)} 1"))
 
         for site, coord in zip(self.structure, cart_coords):
             sp = site.specie.symbol if atom_symbol else f"{site.specie.Z}"
@@ -96,9 +91,9 @@ class XSF:
                     lattice.append([float(c) for c in lines[j].split()])
 
             if "PRIMCOORD" in line:
-                num_sites = int(lines[idx].split()[0])
+                n_sites = int(lines[idx].split()[0])
 
-                for j in range(idx + 1, idx + 1 + num_sites):
+                for j in range(idx + 1, idx + 1 + n_sites):
                     tokens = lines[j].split()
                     Z = Element(tokens[0]).Z if tokens[0].isalpha() else int(tokens[0])
                     species.append(Z)

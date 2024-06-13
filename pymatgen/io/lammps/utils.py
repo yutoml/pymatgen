@@ -173,7 +173,7 @@ class Polymer:
             self.end += len(self.monomer)
 
 
-@deprecated(PackmolBoxGen, "PackmolRunner is being phased out in favor of the packmol I/O class.")
+@deprecated(PackmolBoxGen)
 class PackmolRunner:
     """
     Wrapper for the Packmol software that can be used to pack various types of
@@ -238,15 +238,10 @@ class PackmolRunner:
 
     @staticmethod
     def _format_param_val(param_val) -> str:
-        """
-        Internal method to format values in the packmol parameter dictionaries.
+        """Internal method to format values in the packmol parameter dictionaries.
 
         Args:
-            param_val:
-                Some object to turn into String
-
-        Returns:
-            String representation of the object
+            param_val (Any): Some object to turn into string
         """
         if isinstance(param_val, list):
             return " ".join(str(x) for x in param_val)
@@ -263,8 +258,7 @@ class PackmolRunner:
             self.param_list[idx]["inside box"] = f"0.0 0.0 0.0 {length} {length} {length}"
 
     def _write_input(self, input_dir: str = ".") -> None:
-        """
-        Write the packmol input file to the input directory.
+        """Write the packmol input file to the input directory.
 
         Args:
             input_dir (str): path to the input directory
@@ -297,8 +291,7 @@ class PackmolRunner:
                 inp.write("end structure\n")
 
     def run(self, site_property: str | None = None) -> Molecule:
-        """
-        Write the input file to the scratch directory, run packmol and return
+        """Write the input file to the scratch directory, run packmol and return
         the packed molecule to the current working directory.
 
         Args:
@@ -418,7 +411,7 @@ class PackmolRunner:
         bma = BabelMolAdaptor.from_file(filename, "pdb")
         pbm = pybel.Molecule(bma._ob_mol)
 
-        assert len(pbm.residues) == sum(x["number"] for x in self.param_list)
+        assert len(pbm.residues) == sum(param["number"] for param in self.param_list)
 
         packed_mol = self.convert_obatoms_to_molecule(
             pbm.residues[0].atoms,

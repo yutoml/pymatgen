@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import pickle
+import re
 from copy import deepcopy
 from enum import Enum
 
@@ -12,6 +13,7 @@ from pytest import approx
 from pymatgen.core import DummySpecies, Element, Species, get_el_sp
 from pymatgen.core.periodic_table import ElementBase, ElementType
 from pymatgen.core.units import Ha_to_eV
+from pymatgen.io.core import ParseError
 from pymatgen.util.testing import PymatgenTest
 
 
@@ -227,21 +229,25 @@ class TestElement(PymatgenTest):
             assert Element(key).ground_state_term_symbol == val
 
     def test_attributes(self):
-        is_true = {
-            ("Xe", "Kr"): "is_noble_gas",
-            ("Fe", "Ni"): "is_transition_metal",
-            ("Li", "Cs"): "is_alkali",
-            ("Ca", "Mg"): "is_alkaline",
-            ("F", "Br", "I"): "is_halogen",
-            ("La",): "is_lanthanoid",
-            ("U", "Pu"): "is_actinoid",
-            ("Si", "Ge"): "is_metalloid",
-            ("O", "Te"): "is_chalcogen",
+        bool_attrs = {
+            ("Xe", "Kr"): ("is_noble_gas", True),
+            ("H", "Cl"): ("is_noble_gas", False),
+            ("Fe", "Ni"): ("is_transition_metal", True),
+            ("Li", "Cs"): ("is_alkali", True),
+            ("Ca", "Mg"): ("is_alkaline", True),
+            ("F", "Br", "I"): ("is_halogen", True),
+            ("La", "Ce", "Lu"): ("is_lanthanoid", True),
+            ("U", "Pu"): ("is_actinoid", True),
+            ("Si", "Ge"): ("is_metalloid", True),
+            ("O", "Te"): ("is_chalcogen", True),
+            ("N", "Sb", "Ta"): ("is_chalcogen", False),
+            ("Tc", "Po"): ("is_radioactive", True),
+            ("H", "Li", "Bi"): ("is_radioactive", False),
         }
 
-        for key, val in is_true.items():
-            for sym in key:
-                assert getattr(Element(sym), val), f"{sym=} is false"
+        for elements, (attr, expected) in bool_attrs.items():
+            for elem in elements:
+                assert getattr(Element(elem), attr) is expected, f"{elem=} {attr=}, {expected=}"
 
         keys = (
             "atomic_mass",
@@ -288,15 +294,15 @@ class TestElement(PymatgenTest):
         # Test all elements up to Uranium
         for idx in range(1, 104):
             el = Element.from_Z(idx)
-            for key in keys:
-                key_str = key.capitalize().replace("_", " ")
+            for elements in keys:
+                key_str = elements.capitalize().replace("_", " ")
                 if key_str in el.data and (not str(el.data[key_str]).startswith("no data")):
-                    assert getattr(el, key) is not None
-                elif key == "long_name":
+                    assert getattr(el, elements) is not None
+                elif elements == "long_name":
                     assert el.long_name == el.data["Name"]
-                elif key == "iupac_ordering":
+                elif elements == "iupac_ordering":
                     assert "IUPAC ordering" in el.data
-                    assert getattr(el, key) is not None
+                    assert getattr(el, elements) is not None
 
             if len(el.oxidation_states) > 0:
                 assert max(el.oxidation_states) == el.max_oxidation_state
@@ -413,9 +419,7 @@ class TestSpecies(PymatgenTest):
         assert self.specie4.spin == 5
 
     def test_deepcopy(self):
-        el1 = Species("Fe4+")
-        el2 = Species("Na1+")
-        elem_list = [el1, el2]
+        elem_list = [Species("Fe4+"), Species("Na1+")]
         assert elem_list == deepcopy(elem_list), "Deepcopy operation doesn't produce exact copy."
 
     def test_pickle(self):
@@ -527,12 +531,20 @@ class TestSpecies(PymatgenTest):
         ("P5+", "P", 5),
         ("Na0+", "Na", 0),
         ("Na0-", "Na", 0),
+        ("C0.53-", "C", -0.53),
+        ("Tc3.498+", "Tc", 3.498),
     ],
 )
 def test_symbol_oxi_state_str(symbol_oxi, expected_element, expected_oxi_state):
     species = Species(symbol_oxi)
     assert species._el.symbol == expected_element
-    assert species._oxi_state == expected_oxi_state
+    assert species._oxi_state == pytest.approx(expected_oxi_state, rel=1.0e-6)
+
+
+def test_symbol_oxi_state_str_raises():
+    symbol = "Fe2.5f2123+"  # invalid oxidation state
+    with pytest.raises(ParseError, match=re.escape(f"Failed to parse {symbol=}")):
+        _ = Species(symbol)
 
 
 class TestDummySpecies:
@@ -589,6 +601,14 @@ class TestDummySpecies:
         )
         assert sp.spin == 5
 
+    def test_not_implemented(self):
+        with pytest.raises(NotImplementedError):
+            _ = Species("Fe", 2).full_electronic_structure
+        with pytest.raises(NotImplementedError):
+            _ = Species("Fe", 2).electronic_structure
+        with pytest.raises(NotImplementedError):
+            _ = Species("Fe", 2).valence
+
 
 def test_get_el_sp():
     assert get_el_sp("Fe2+") == Species("Fe", 2)
@@ -609,4 +629,4 @@ def test_get_el_sp():
 def test_element_type():
     assert isinstance(ElementType.actinoid, Enum)
     assert isinstance(ElementType.metalloid, Enum)
-    assert len(ElementType) == 17
+    assert len(ElementType) == 18

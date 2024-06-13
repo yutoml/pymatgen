@@ -131,7 +131,7 @@ class TestSupercellTransformation(TestCase):
     def test_from_boundary_distance(self):
         struct_cubic = Structure.from_spacegroup("Pm-3m", 4 * np.eye(3), ["H"], [[0, 0, 0]])
 
-        for struct in [struct_cubic, self.struct]:
+        for struct in (struct_cubic, self.struct):
             for min_dist in range(6, 19, 4):
                 trafo = SupercellTransformation.from_boundary_distance(
                     structure=struct, min_boundary_dist=min_dist, allow_rotation=False
@@ -381,7 +381,7 @@ class TestPrimitiveCellTransformation:
         struct = trafo.apply_transformation(struct)
         assert len(struct) == 4
 
-        with open(f"{TEST_FILES_DIR}/TiO2_super.json") as file:
+        with open(f"{TEST_FILES_DIR}/transformations/TiO2_super.json") as file:
             struct = json.load(file, cls=MontyDecoder)
             prim = trafo.apply_transformation(struct)
             assert prim.formula == "Ti4 O8"
@@ -530,7 +530,7 @@ class TestScaleToRelaxedTransformation:
         assert Au_fin.volume == approx(Au_init.volume)
 
         # Test on gb relaxation
-        gb_dir = f"{TEST_FILES_DIR}/grain_boundary"
+        gb_dir = f"{TEST_FILES_DIR}/core/grain_boundary"
         Be_fin = Structure.from_file(f"{gb_dir}/Be_gb_fin.cif")
         Be_init = Structure.from_file(f"{gb_dir}/Be_gb_init.cif")
         Zn_init = Structure.from_file(f"{gb_dir}/Zn_gb_init.cif")

@@ -5,6 +5,7 @@ change until best practices are established.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from os import PathLike as OsPathLike
 from typing import TYPE_CHECKING, Any, Union
 
@@ -17,6 +18,9 @@ if TYPE_CHECKING:  # needed to avoid circular imports
     from pymatgen.entries.computed_entries import ComputedEntry, ComputedStructureEntry, GibbsComputedStructureEntry
     from pymatgen.entries.exp_entries import ExpEntry
 
+# Commonly used composite types
+Tuple3Ints = tuple[int, int, int]
+Tuple3Floats = tuple[float, float, float]
 
 PathLike = Union[str, OsPathLike]
 PbcLike = tuple[bool, bool, bool]
@@ -40,3 +44,14 @@ EntryLike = Union[
     "CostEntry",
     "GibbsComputedStructureEntry",
 ]
+
+Vector3D = Tuple3Floats
+Matrix3D = tuple[Vector3D, Vector3D, Vector3D]
+
+SitePropsType = Union[list[dict[Any, Sequence[Any]]], dict[Any, Sequence[Any]]]
+
+# Types specific to io.vasp
+Kpoint = Union[Tuple3Floats, tuple[int,]]
+
+# Miller index
+MillerIndex = Tuple3Ints

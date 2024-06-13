@@ -48,8 +48,7 @@ class Stress(SquareTensor):
 
     @property
     def dev_principal_invariants(self):
-        """
-        Returns the principal invariants of the deviatoric stress tensor,
+        """The principal invariants of the deviatoric stress tensor,
         which is calculated by finding the coefficients of the characteristic
         polynomial of the stress tensor minus the identity times the mean
         stress.
@@ -58,7 +57,7 @@ class Stress(SquareTensor):
 
     @property
     def von_mises(self):
-        """Returns the von Mises stress."""
+        """The von Mises stress."""
         if not self.is_symmetric():
             raise ValueError(
                 "The stress tensor is not symmetric, Von Mises stress is based on a symmetric stress tensor."
@@ -67,12 +66,12 @@ class Stress(SquareTensor):
 
     @property
     def mean_stress(self):
-        """Returns the mean stress."""
+        """The mean stress."""
         return 1 / 3 * self.trace()
 
     @property
     def deviator_stress(self):
-        """Returns the deviatoric component of the stress."""
+        """The deviatoric component of the stress."""
         if not self.is_symmetric:
             raise ValueError("The stress tensor is not symmetric, so deviator stress will not be either")
         return self - self.mean_stress * np.eye(3)

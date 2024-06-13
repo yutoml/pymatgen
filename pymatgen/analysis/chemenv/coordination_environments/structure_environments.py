@@ -41,12 +41,12 @@ symbol_cn_mapping = all_cg.get_symbol_cn_mapping()
 
 
 class StructureEnvironments(MSONable):
-    """Class used to store the chemical environments of a given structure."""
+    """Store the chemical environments of a given structure."""
 
     AC = AdditionalConditions()
 
     class NeighborsSet:
-        """Class used to store a given set of neighbors of a given site (based on the detailed_voronoi)."""
+        """Store a given set of neighbors of a given site (based on the detailed_voronoi)."""
 
         def __init__(self, structure: Structure, isite, detailed_voronoi, site_voronoi_indices, sources=None):
             """Constructor for NeighborsSet.
@@ -172,40 +172,36 @@ class StructureEnvironments(MSONable):
             }
 
         def distance_plateau(self):
-            """Returns the distances plateau's for this NeighborsSet."""
+            """Get the distances plateau's for this NeighborsSet."""
             all_nbs_normalized_distances_sorted = sorted(
                 (nb["normalized_distance"] for nb in self.voronoi), reverse=True
             )
-            maxdist = np.max(self.normalized_distances)
+            max_dist = np.max(self.normalized_distances)
             plateau = None
-            for idist, dist in enumerate(all_nbs_normalized_distances_sorted):
-                if np.isclose(
-                    dist,
-                    maxdist,
-                    rtol=0.0,
-                    atol=self.detailed_voronoi.normalized_distance_tolerance,
-                ):
-                    plateau = np.inf if idist == 0 else all_nbs_normalized_distances_sorted[idist - 1] - maxdist
+            abs_tol = self.detailed_voronoi.normalized_distance_tolerance
+            for idx, dist in enumerate(all_nbs_normalized_distances_sorted):
+                if np.isclose(dist, max_dist, rtol=0.0, atol=abs_tol):
+                    plateau = np.inf if idx == 0 else all_nbs_normalized_distances_sorted[idx - 1] - max_dist
                     break
             if plateau is None:
                 raise ValueError("Plateau not found ...")
             return plateau
 
         def angle_plateau(self):
-            """Returns the angles plateau's for this NeighborsSet."""
+            """Get the angles plateau's for this NeighborsSet."""
             all_nbs_normalized_angles_sorted = sorted(nb["normalized_angle"] for nb in self.voronoi)
-            minang = np.min(self.normalized_angles)
+            min_ang = np.min(self.normalized_angles)
             for nb in self.voronoi:
                 print(nb)
             plateau = None
             for iang, ang in enumerate(all_nbs_normalized_angles_sorted):
                 if np.isclose(
                     ang,
-                    minang,
+                    min_ang,
                     rtol=0.0,
                     atol=self.detailed_voronoi.normalized_angle_tolerance,
                 ):
-                    plateau = minang if iang == 0 else minang - all_nbs_normalized_angles_sorted[iang - 1]
+                    plateau = min_ang if iang == 0 else min_ang - all_nbs_normalized_angles_sorted[iang - 1]
                     break
             if plateau is None:
                 raise ValueError("Plateau not found ...")
@@ -501,12 +497,12 @@ class StructureEnvironments(MSONable):
                         "ac_name": self.AC.CONDITION_DESCRIPTION[ac],
                     }
                     site_voronoi_indices = [
-                        inb
-                        for inb, _voro_nb_dict in enumerate(site_voronoi)
+                        idx
+                        for idx in range(len(site_voronoi))
                         if (
-                            distance_conditions[idp][inb]
-                            and angle_conditions[iap][inb]
-                            and precomputed_additional_conditions[ac][inb]
+                            distance_conditions[idp][idx]
+                            and angle_conditions[iap][idx]
+                            and precomputed_additional_conditions[ac][idx]
                         )
                     ]
                     nb_set = self.NeighborsSet(
@@ -578,8 +574,7 @@ class StructureEnvironments(MSONable):
         self.info["sites_info"][isite].update(info_dict)
 
     def get_coordination_environments(self, isite, cn, nb_set):
-        """
-        Get the ChemicalEnvironments for a given site, coordination and neighbors set.
+        """Get the ChemicalEnvironments for a given site, coordination and neighbors set.
 
         Args:
             isite: Index of the site for which the ChemicalEnvironments is looked for.
@@ -600,8 +595,7 @@ class StructureEnvironments(MSONable):
         return self.ce_list[isite][cn][nb_set_index]
 
     def get_csm(self, isite, mp_symbol):
-        """
-        Get the continuous symmetry measure for a given site in the given coordination environment.
+        """Get the continuous symmetry measure for a given site in the given coordination environment.
 
         Args:
             isite: Index of the site.
@@ -620,8 +614,7 @@ class StructureEnvironments(MSONable):
         return csms[0]
 
     def get_csms(self, isite, mp_symbol) -> list:
-        """
-        Returns the continuous symmetry measure(s) of site with index isite with respect to the
+        """Get the continuous symmetry measure(s) of site with index isite with respect to the
         perfect coordination environment with mp_symbol. For some environments, a given mp_symbol might not
         be available (if there is no voronoi parameters leading to a number of neighbors corresponding to
         the coordination number of environment mp_symbol). For some environments, a given mp_symbol might
@@ -1018,8 +1011,7 @@ class StructureEnvironments(MSONable):
         max_dist=2.0,
         figsize=None,
     ):
-        """
-        Saves the environments figure to a given file.
+        """Save the environments figure to a given file.
 
         Args:
             isite: Index of the site for which the plot has to be done.
@@ -1044,8 +1036,7 @@ class StructureEnvironments(MSONable):
         fig.savefig(imagename)
 
     def differences_wrt(self, other):
-        """
-        Return differences found in the current StructureEnvironments with respect to another StructureEnvironments.
+        """Get differences found in the current StructureEnvironments with respect to another StructureEnvironments.
 
         Args:
             other: A StructureEnvironments object.
@@ -1316,8 +1307,7 @@ class StructureEnvironments(MSONable):
 
 
 class LightStructureEnvironments(MSONable):
-    """
-    Class used to store the chemical environments of a given structure obtained from a given ChemenvStrategy. Currently,
+    """Store the chemical environments of a given structure obtained from a given ChemenvStrategy. Currently,
     only strategies leading to the determination of a unique environment for each site is allowed
     This class does not store all the information contained in the StructureEnvironments object, only the coordination
     environment found.
@@ -1718,8 +1708,7 @@ class LightStructureEnvironments(MSONable):
                 }
 
     def get_site_info_for_specie_ce(self, specie, ce_symbol):
-        """
-        Get list of indices that have the given specie with a given Coordination environment.
+        """Get list of indices that have the given specie with a given Coordination environment.
 
         Args:
             specie: Species to get.
@@ -1747,8 +1736,7 @@ class LightStructureEnvironments(MSONable):
         return {"isites": isites, "fractions": fractions, "csms": csms}
 
     def get_site_info_for_specie_allces(self, specie, min_fraction=0):
-        """
-        Get list of indices that have the given specie.
+        """Get list of indices that have the given specie.
 
         Args:
             specie: Species to get.
@@ -1782,8 +1770,7 @@ class LightStructureEnvironments(MSONable):
         return allces
 
     def get_statistics(self, statistics_fields=DEFAULT_STATISTICS_FIELDS, bson_compatible=False):
-        """
-        Get the statistics of environments for this structure.
+        """Get the statistics of environments for this structure.
 
         Args:
             statistics_fields: Which statistics to get.
@@ -1903,8 +1890,7 @@ class LightStructureEnvironments(MSONable):
         return True
 
     def clear_environments(self, conditions=None):
-        """
-        Get the clear environments in the structure.
+        """Get the clear environments in the structure.
 
         Args:
             conditions: Conditions to be checked for an environment to be "clear".
@@ -1937,16 +1923,15 @@ class LightStructureEnvironments(MSONable):
         Returns:
             bool: True if the coordination environment is found for the given atom.
         """
-        for isite, site in enumerate(self.structure):
+        for idx, site in enumerate(self.structure):
             if Element(atom_symbol) in site.species.element_composition and self.site_contains_environment(
-                isite, ce_symbol
+                idx, ce_symbol
             ):
                 return True
         return False
 
     def environments_identified(self):
-        """
-        Return the set of environments identified in this structure.
+        """Get the set of environments identified in this structure.
 
         Returns:
             set: environments identified in this structure.
@@ -1959,8 +1944,7 @@ class LightStructureEnvironments(MSONable):
         return self.strategy.uniquely_determines_coordination_environments
 
     def __eq__(self, other: object) -> bool:
-        """
-        Equality method that checks if the LightStructureEnvironments object is equal to another
+        """Equality method that checks if the LightStructureEnvironments object is equal to another
         LightStructureEnvironments object. Two LightStructureEnvironments objects are equal if the strategy used
         is the same, if the structure is the same, if the valences used in the strategies are the same, if the
         coordination environments and the neighbors determined by the strategy are the same.
@@ -2021,7 +2005,7 @@ class LightStructureEnvironments(MSONable):
         }
 
     @classmethod
-    def from_dict(cls, dct) -> Self:
+    def from_dict(cls, dct: dict) -> Self:
         """
         Reconstructs the LightStructureEnvironments object from a dict representation of the
         LightStructureEnvironments created using the as_dict method.
@@ -2071,21 +2055,19 @@ class LightStructureEnvironments(MSONable):
 
 
 class ChemicalEnvironments(MSONable):
-    """
-    Class used to store all the information about the chemical environment of a given site for a given list of
+    """Store all the information about the chemical environment of a given site for a given list of
     coordinated neighbors (internally called "cn_map").
     """
 
     def __init__(self, coord_geoms=None):
-        """
-        Initializes the ChemicalEnvironments object containing all the information about the chemical
+        """Initialize the ChemicalEnvironments object containing all the information about the chemical
         environment of a given site.
 
         Args:
             coord_geoms: coordination geometries to be added to the chemical environment.
         """
         if coord_geoms is None:
-            self.coord_geoms = {}
+            self.coord_geoms: dict = {}
         else:
             raise NotImplementedError(
                 "Constructor for ChemicalEnvironments with the coord_geoms argument is not yet implemented"
@@ -2095,8 +2077,7 @@ class ChemicalEnvironments(MSONable):
         return self.coord_geoms[mp_symbol]
 
     def __len__(self):
-        """
-        Returns the number of coordination geometries in this ChemicalEnvironments object.
+        """Get the number of coordination geometries in this ChemicalEnvironments object.
 
         Returns:
             Number of coordination geometries in this ChemicalEnvironments object.
@@ -2107,8 +2088,7 @@ class ChemicalEnvironments(MSONable):
         yield from self.coord_geoms.items()
 
     def minimum_geometry(self, symmetry_measure_type=None, max_csm=None):
-        """
-        Returns the geometry with the minimum continuous symmetry measure of this ChemicalEnvironments.
+        """Get the geometry with the minimum continuous symmetry measure of this ChemicalEnvironments.
 
         Returns:
             tuple (symbol, csm) with symbol being the geometry with the minimum continuous symmetry measure and
@@ -2131,8 +2111,7 @@ class ChemicalEnvironments(MSONable):
         return cglist[imin], csmlist[imin]
 
     def minimum_geometries(self, n=None, symmetry_measure_type=None, max_csm=None):
-        """
-        Returns a list of geometries with increasing continuous symmetry measure in this ChemicalEnvironments object.
+        """Get a list of geometries with increasing continuous symmetry measure in this ChemicalEnvironments object.
 
         Args:
             n: Number of geometries to be included in the list.
@@ -2220,16 +2199,12 @@ class ChemicalEnvironments(MSONable):
         }
 
     def __str__(self):
-        """
-        Returns a string representation of the ChemicalEnvironments object.
-
-        Returns:
-            String representation of the ChemicalEnvironments object.
-        """
+        """Get a string representation of the ChemicalEnvironments."""
         out = "Chemical environments object :\n"
         if len(self.coord_geoms) == 0:
             out += " => No coordination in it <=\n"
             return out
+        mp_symbol = ""
         for key in self.coord_geoms:
             mp_symbol = key
             break
@@ -2287,8 +2262,7 @@ class ChemicalEnvironments(MSONable):
         return True
 
     def __eq__(self, other: object) -> bool:
-        """
-        Equality method that checks if the ChemicalEnvironments object is equal to another ChemicalEnvironments.
+        """Equality method that checks if the ChemicalEnvironments object is equal to another ChemicalEnvironments.
         object.
 
         Args:
@@ -2327,8 +2301,7 @@ class ChemicalEnvironments(MSONable):
         return True
 
     def as_dict(self):
-        """
-        Returns a dictionary representation of the ChemicalEnvironments object.
+        """Get a dictionary representation of the ChemicalEnvironments object.
 
         Returns:
             A dictionary representation of the ChemicalEnvironments object.
